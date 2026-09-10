@@ -427,6 +427,10 @@
         }).join('') + '</table>' : '<p class="muted-note">' + esc(t('parent.firstTime')) + '</p>') + '</section>';
 
     var hardUnits = units().filter(function (u) { return u.tier === p.tier && u.mature; });
+    html += '<section class="prof-edit-mini"><h3>' + esc(t('set.profile')) + '</h3>' +
+      '<p class="muted-note">' + esc(p.name) + ' · ' + p.age + ' · ' + esc(t('onboard.tier' + p.tier)) + '</p>' +
+      '<button class="btn primary" data-act="go" data-arg="settings">' + esc(t('set.saveProfile')) + ' / ' + esc(t('set.profile')) + '</button></section>';
+
     html += '<section><h3>' + esc(t('parent.level')) + '</h3><p class="muted-note">' + esc(t('parent.levelHelp')) + '</p>' +
       '<div class="row wrap">' + ['L', 'M', 'H'].map(function (k) {
         return '<button class="chip' + (p.tier === k ? ' on' : '') + '" data-act="parent-tier" data-arg="' + k + '">' + esc(t('onboard.tier' + k)) + '</button>';
@@ -597,15 +601,57 @@
   /* ============================ SETTINGS ============================ */
   function settingsView() {
     var s = St.root.settings;
+    var p = prof();
     var voices = (Sp.voices || []).slice(0, 40);
-    var html = '<div class="page-head"><h1>' + esc(t('set.title')) + '</h1></div>' +
-      '<section><h3>' + esc(t('parent.lang')) + '</h3><div class="row wrap">' + I.LANGS.map(function (l) {
-        return '<button class="chip' + (I.lang === l.code ? ' on' : '') + '" data-act="set-lang" data-arg="' + l.code + '">' + esc(l.name) + '</button>';
-      }).join('') + '</div></section>';
+    var html = '<div class="page-head"><h1>' + esc(t('set.title')) + '</h1></div>';
+
+    // ---- Profile (name, age, level, companion) — editable + saved on device ----
+    if (p) {
+      var ageChips = '';
+      for (var a = 3; a <= 12; a++) {
+        ageChips += '<button type="button" class="age-chip' + (p.age === a ? ' on' : '') + '" data-act="prof-age" data-arg="' + a + '"><b>' + a + '</b></button>';
+      }
+      var tierChips = ['L', 'M', 'H'].map(function (k) {
+        return '<button type="button" class="chip' + (p.tier === k ? ' on' : '') + '" data-act="prof-tier" data-arg="' + k + '">' + esc(t('onboard.tier' + k)) + '</button>';
+      }).join('');
+      var compGrid = Object.keys(L.COMPANIONS).map(function (k) {
+        return '<button type="button" class="comp-card' + (p.companion.type === k ? ' on' : '') + '" data-act="prof-comp" data-arg="' + k + '">' +
+          Art.companion(k, 0, { skin: L.TIERS[p.tier].skin, scene: false }) +
+          '<b>' + esc(L.COMPANIONS[k].name) + '</b></button>';
+      }).join('');
+      var storageNote = St.persistent ? t('set.storageOk') : t('set.storageNo');
+      html += '<section class="prof-edit">' +
+        '<h3>' + esc(t('set.profile')) + '</h3>' +
+        '<p class="muted-note">' + esc(t('set.profileHint')) + '</p>' +
+        '<label class="field"><span>' + esc(t('set.name')) + '</span>' +
+        '<input class="big-input" id="set-name" maxlength="20" value="' + esc(p.name) + '" autocomplete="nickname"/></label>' +
+        '<div class="field"><span>' + esc(t('set.age')) + '</span><div class="age-grid">' + ageChips + '</div></div>' +
+        '<div class="field"><span>' + esc(t('set.level')) + '</span><div class="row wrap">' + tierChips + '</div>' +
+        '<button type="button" class="btn linkbtn" data-act="prof-retier">' + esc(t('set.levelAuto')) + '</button></div>' +
+        '<div class="field"><span>' + esc(t('set.companion')) + '</span><div class="comp-grid">' + compGrid + '</div></div>' +
+        '<label class="field"><span>' + esc(t('set.companionName')) + '</span>' +
+        '<input class="big-input" id="set-comp-name" maxlength="18" value="' + esc(p.companion.name) + '"/></label>' +
+        '<div class="row wrap">' +
+        '<button type="button" class="btn primary big" data-act="prof-save">' + esc(t('set.saveProfile')) + '</button>' +
+        '<button type="button" class="btn ghost" data-act="go" data-arg="switch">' + esc(t('parent.switch')) + '</button>' +
+        '<button type="button" class="btn ghost" data-act="go" data-arg="onboard">＋ ' + esc(t('parent.add')) + '</button>' +
+        '</div>' +
+        '<p class="muted-note" id="set-storage-note">' + esc(storageNote) + '</p>' +
+        '</section>';
+    } else {
+      html += '<section><p class="muted-note">' + esc(t('parent.firstTime')) + '</p>' +
+        '<button class="btn primary" data-act="go" data-arg="onboard">' + esc(t('parent.add')) + '</button></section>';
+    }
+
+    html += '<section><h3>' + esc(t('parent.lang')) + '</h3><div class="row wrap">' + I.LANGS.map(function (l) {
+      return '<button class="chip' + (I.lang === l.code ? ' on' : '') + '" data-act="set-lang" data-arg="' + l.code + '">' + esc(l.name) + '</button>';
+    }).join('') + '</div></section>';
+
     html += '<section><h3>' + esc(t('player.voiceLang')) + '</h3><div class="row wrap">' +
-      (root.SS_StoryI18n ? root.SS_StoryI18n.VOICE_LANGS : [{code:'en',label:'English'},{code:'ur',label:'اردو'},{code:'hi',label:'हिन्दी'},{code:'ar',label:'عربي'}]).map(function (v) {
+      (root.SS_StoryI18n ? root.SS_StoryI18n.VOICE_LANGS : [{ code: 'en', label: 'English' }, { code: 'ur', label: 'اردو' }, { code: 'hi', label: 'हिन्दी' }, { code: 'ar', label: 'عربي' }]).map(function (v) {
         return '<button class="chip' + ((s.narrLang || 'en') === v.code ? ' on' : '') + '" data-act="set-narr-lang" data-arg="' + v.code + '">' + esc(v.label) + '</button>';
       }).join('') + '</div><p class="muted-note">' + esc(t('player.voiceLangHint')) + '</p></section>';
+
     html += '<section><h3>' + esc(t('set.narration')) + '</h3>' +
       '<label class="tog"><input type="checkbox" data-setting="narration"' + (s.narration !== false ? ' checked' : '') + '/><span>' + esc(t('player.listen')) + '</span></label>' +
       '<label class="tog"><input type="checkbox" data-setting="readAlong"' + (s.readAlong !== false ? ' checked' : '') + '/><span>' + esc(t('set.readalong')) + '</span></label>' +
@@ -622,8 +668,16 @@
       '<p class="muted-note">' + esc(np === 'unsupported' ? 'This browser has no notification support; the daily verse card still appears in the app.' : 'Permission: ' + np) + ' · once a day, never more.</p></section>';
 
     html += '<section><h3>' + esc(t('set.offline')) + '</h3>' +
-      '<button class="btn ghost" data-act="offline-all">' + esc(t('set.offlineOn')) + ' (' + L.pathUnits(units(), prof().tier).length + ')</button>' +
+      '<button class="btn ghost" data-act="offline-all">' + esc(t('set.offlineOn')) + ' (' + L.pathUnits(units(), (prof() || { tier: 'M' }).tier).length + ')</button>' +
       '<p class="muted-note">' + esc(Sy.online() ? 'Online' : t('sync.now')) + ' · ' + esc(Sy.pending() ? t('sync.pend', { n: Sy.pending() }) : t('sync.none')) + '</p></section>';
+
+    html += '<section><h3>' + esc(t('set.backup')) + '</h3>' +
+      '<p class="muted-note">' + esc(t('set.backupHint')) + '</p>' +
+      '<div class="row wrap">' +
+      '<button class="btn ghost" data-act="export">' + esc(t('parent.export')) + '</button>' +
+      '<button class="btn ghost" data-act="import">' + esc(t('parent.import')) + '</button>' +
+      '<button class="btn ghost" data-act="prof-save-now">' + esc(t('set.saveProfile')) + '</button>' +
+      '</div></section>';
 
     html += '<section><h3>' + esc(t('safe.title')) + '</h3><p class="muted-note">' + esc(t('safe.body')) + '</p></section>';
     html += '<section><h3>' + esc(t('set.about')) + '</h3><p>' + esc(t('set.aboutText')) + '</p>' +
@@ -631,6 +685,55 @@
     html += '<section><button class="btn ghost dangerish" data-act="reset-profile">' + esc(t('set.reset')) + '</button></section>';
     return html;
   }
+
+
+  A['prof-age'] = function (a) {
+    var age = parseInt(a, 10);
+    // Only highlight until Save — keep draft on the inputs via live update
+    St.setAge(age, { retier: false });
+    paint();
+  };
+  A['prof-tier'] = function (k) {
+    St.setTier(k);
+    toast(t('parent.level'));
+    paint();
+  };
+  A['prof-retier'] = function () {
+    var p = prof(); if (!p) return;
+    St.setAge(p.age, { retier: true, lock: false });
+    // unlock auto tier
+    p = prof(); if (p) { p.tierLocked = false; St.save(); }
+    toast(t('set.levelAuto'));
+    paint();
+  };
+  A['prof-comp'] = function (k) {
+    St.setCompanionType(k);
+    paint();
+  };
+  A['prof-save'] = function () {
+    var p = prof(); if (!p) return;
+    var nameEl = document.getElementById('set-name');
+    var compEl = document.getElementById('set-comp-name');
+    var name = nameEl ? nameEl.value : p.name;
+    var cname = compEl ? compEl.value : (p.companion && p.companion.name);
+    St.updateProfile({
+      name: name,
+      age: p.age,
+      tier: p.tier,
+      companionType: p.companion && p.companion.type,
+      companionName: cname
+    });
+    var res = St.saveNow ? St.saveNow() : { ok: St.save(), persistent: St.persistent };
+    if (res.ok) toast(t('set.saved'));
+    else toast(t('set.saveFailed'));
+    paint();
+  };
+  A['prof-save-now'] = function () {
+    var res = St.saveNow ? St.saveNow() : { ok: St.save(), persistent: St.persistent };
+    toast(res.ok ? t('set.saved') : t('set.saveFailed'));
+    paint();
+  };
+
   A['set-lang'] = function (code) {
     St.setSetting('lang', code); paint();
   };

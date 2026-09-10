@@ -689,3 +689,23 @@ input[type="time"] { min-height: 46px; border-radius: var(--radius-s); border: 2
   .para { border: none; font-size: 14pt; }
 }
 .onboard .ob-note{margin:14px auto 0;max-width:40ch;text-align:center;font-size:13px;color:var(--muted,#6a6355)}
+
+/* ---------- settings profile editor ---------- */
+.prof-edit, .prof-edit-mini {
+  background: var(--surface);
+  border: 2px solid var(--line);
+  border-radius: var(--radius);
+  padding: 16px;
+  box-shadow: var(--shadow);
+}
+.prof-edit .field { display: grid; gap: 8px; margin: 12px 0; }
+.prof-edit .field > span {
+  font-size: 12px; font-weight: 900; letter-spacing: .06em;
+  text-transform: uppercase; color: var(--brand-2);
+}
+.prof-edit .age-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; }
+.prof-edit .comp-grid { grid-template-columns: repeat(4, 1fr); }
+@media (max-width: 520px) {
+  .prof-edit .comp-grid { grid-template-columns: repeat(3, 1fr); }
+  .prof-edit .age-grid { grid-template-columns: repeat(4, 1fr); }
+}

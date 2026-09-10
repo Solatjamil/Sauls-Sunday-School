@@ -194,6 +194,60 @@
       p.tier = tier; p.tierLocked = true;
       Store.save();
     },
+    setName: function (name) {
+      var p = Store.profile(); if (!p) return;
+      p.name = String(name || p.name || 'Friend').trim().slice(0, 20) || 'Friend';
+      Store.save();
+      return p;
+    },
+    setAge: function (age, opts) {
+      opts = opts || {};
+      var p = Store.profile(); if (!p) return;
+      var a = L().clampAge(age);
+      p.age = a;
+      // Keep level matched to age unless a grown-up locked a custom level
+      if (opts.retier) {
+        p.tier = L().tierForAge(a);
+        p.tierLocked = !!opts.lock;
+      } else if (!p.tierLocked) {
+        p.tier = L().tierForAge(a);
+      }
+      Store.save();
+      return p;
+    },
+    // Save several profile fields in one write (Settings form)
+    updateProfile: function (data) {
+      var p = Store.profile(); if (!p) return null;
+      data = data || {};
+      if (data.name != null) p.name = String(data.name || 'Friend').trim().slice(0, 20) || 'Friend';
+      if (data.age != null) {
+        p.age = L().clampAge(data.age);
+        if (data.retier || !p.tierLocked) p.tier = L().tierForAge(p.age);
+      }
+      if (data.tier != null && (data.tier === 'L' || data.tier === 'M' || data.tier === 'H')) {
+        p.tier = data.tier;
+        p.tierLocked = true;
+      }
+      if (data.companionName != null) {
+        p.companion = p.companion || { type: 'lamb', name: 'Pip' };
+        p.companion.name = String(data.companionName || p.companion.name || 'Pip').trim().slice(0, 18) || 'Pip';
+      }
+      if (data.companionType != null && data.companionType) {
+        p.companion = p.companion || { type: 'lamb', name: 'Pip' };
+        p.companion.type = data.companionType;
+      }
+      p.updatedAt = Date.now();
+      Store.save();
+      return p;
+    },
+    // Force a full disk write + return whether storage is working
+    saveNow: function () {
+      var ok = Store.save();
+      Store.persistent = (function () {
+        try { return root.localStorage.getItem(KEY) != null; } catch (e) { return false; }
+      })();
+      return { ok: !!ok, persistent: !!Store.persistent };
+    },
     setSetting: function (k, v) {
       Store.root.settings[k] = v;
       if (k === 'lang') I().set(v);
