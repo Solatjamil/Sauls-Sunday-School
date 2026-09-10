@@ -149,134 +149,99 @@
   }
 
   /* ============================================================
-     ONBOARDING  (name + age → placement quiz → level → companion)
+     ONBOARDING — three questions only: name, age, companion friend
      ============================================================ */
   var ob = null;
+  function petGuess(type) {
+    return { lamb: 'Pip', dove: 'Shilo', donkey: 'Colt', hen: 'Nula', ewe: 'Mika', camel: 'Rami', shepherd: 'Obed', lion: 'Asa' }[type] || 'Pip';
+  }
+  function finishOnboard() {
+    if (!ob || !ob.name) return;
+    ob.tier = L.tierForAge(ob.age);
+    if (!ob.compName) ob.compName = petGuess(ob.compType || 'lamb');
+    St.createProfile({ name: ob.name, age: ob.age, tier: ob.tier, companionType: ob.compType || 'lamb', companionName: ob.compName });
+    St.root.device.seenIntro = true; St.save();
+    var savedName = ob.name;
+    ob = null; Sp.lang = I.LANGS.filter(function (x) { return x.code === I.lang; })[0] ? I.lang : 'en';
+    Sp.init();
+    go('home');
+    toast(t('onboard.hello', { name: savedName }));
+  }
   function onboardView() {
-    if (!ob) ob = { step: 0, name: '', age: 6, answers: {}, tier: null, compType: 'lamb', compName: '' };
-    var steps = ['welcome', 'name', 'age', 'quiz', 'level', 'companion', 'namepet', 'done'];
-    var step = steps[ob.step];
-    var dots = '<div class="ob-dots">' + steps.map(function (s, i) { return '<span class="dot' + (i === ob.step ? ' on' : '') + (i < ob.step ? ' past' : '') + '"></span>'; }).join('') + '</div>';
+    if (!ob) ob = { step: 0, name: '', age: 3, answers: {}, tier: null, compType: 'lamb', compName: '' };
+    var steps = ['name', 'age', 'companion'];
+    var step = steps[ob.step] || 'name';
+    var dots = '<div class="ob-dots">' + steps.map(function (s, i) {
+      return '<span class="dot' + (i === ob.step ? ' on' : '') + (i < ob.step ? ' past' : '') + '"></span>';
+    }).join('') + '</div>';
     var body = '';
 
-    if (step === 'welcome') {
-      body = '<div class="ob-hero">' + Art.logo('young') +
-        '<h1>' + esc(t('onboard.welcome')) + '</h1><p>' + esc(t('onboard.welcomeSub')) + '</p>' +
-        '<button class="btn big primary" data-act="ob-next" data-focus>' + esc(t('common.yes')) + ' →</button>' +
-        brandCard() + '</div>';
-    }
     if (step === 'name') {
-      body = '<h1 class="ob-q">' + esc(t('onboard.name')) + '</h1><p class="ob-hint">' + esc(t('onboard.nameHint')) + '</p>' +
-        '<input class="big-input" data-ob="name" value="' + esc(ob.name) + '" maxlength="20" autocomplete="off" placeholder="' + esc(t('onboard.name')) + '" data-focus />';
+      body = '<div class="ob-hero compact">' + Art.logo('young') +
+        '<p class="ob-brand">' + esc(t('set.brand')) + '</p>' +
+        '<h1 class="ob-q">' + esc(t('onboard.name')) + '</h1>' +
+        '<p class="ob-hint">' + esc(t('onboard.nameHint')) + '</p>' +
+        '<input class="big-input" data-ob="name" value="' + esc(ob.name) + '" maxlength="20" autocomplete="off" placeholder="' + esc(t('onboard.name')) + '" data-focus />' +
+        '</div>';
     }
     if (step === 'age') {
       var chips = '';
       for (var a = 3; a <= 12; a++) chips += '<button class="age-chip' + (ob.age === a ? ' on' : '') + '" data-act="ob-age" data-arg="' + a + '"><b>' + a + '</b></button>';
-      body = '<h1 class="ob-q">' + esc(t('onboard.age')) + '</h1><div class="age-grid">' + chips + '</div>' +
-        '<p class="ob-hint">' + esc(t('onboard.ageHint')) + '</p>' +
-        '<p class="tier-note">' + esc(t('onboard.tier' + L.tierForAge(ob.age)) ) + ' · ' + esc(t('lib.' + (L.tierForAge(ob.age) === 'L' ? 'story' : L.tierForAge(ob.age) === 'M' ? 'lesson' : 'game'))) + '</p>';
-    }
-    if (step === 'quiz') {
-      var i = ob.quizIndex || 0;
-      var q = L.PLACEMENT[i];
-      if (!q) { ob.step++; return onboardView(); }
-      body = '<h1 class="ob-q">' + esc(t('onboard.quiz')) + '</h1><p class="ob-hint">' + esc(t('onboard.quizIntro')) + '</p>' +
-        '<div class="pq-count">' + (i + 1) + ' / ' + L.PLACEMENT.length + '</div>' +
-        '<p class="pq-text">' + esc(q.q) + '</p>' +
-        '<div class="pq-opts">' + q.a.map(function (opt, idx) {
-          return '<button class="pq-opt' + (ob.answers[i] === idx ? ' on' : '') + '" data-act="ob-answer" data-arg="' + idx + '">' + esc(opt) + '</button>';
-        }).join('') + '</div>' +
-        '<div class="row">' +
-        (i > 0 ? '<button class="btn ghost" data-act="ob-quiz-back">← ' + esc(t('common.back')) + '</button>' : '') +
-        '<button class="btn primary" data-act="ob-quiz-next"' + (ob.answers[i] == null ? ' disabled' : '') + '>' + esc(i === L.PLACEMENT.length - 1 ? t('common.done') : t('player.next')) + '</button>' +
-        '<button class="btn linkbtn" data-act="ob-skip-quiz">' + esc(t('onboard.quizSkip')) + '</button></div>';
-    }
-    if (step === 'level') {
-      var sc = L.scorePlacement(ob.answers);
-      var suggested = ob.tier || sc.suggested;
-      body = '<h1 class="ob-q">' + esc(t('onboard.suggested')) + '</h1>' +
-        '<div class="tier-cards">' + ['L', 'M', 'H'].map(function (k) {
-          var T = L.TIERS[k];
-          return '<button class="tier-card' + (suggested === k ? ' on' : '') + (k === 'L' ? ' rec' : '') + '" data-act="ob-tier" data-arg="' + k + '">' +
-            Art.motif(k === 'L' ? 'lamb' : k === 'M' ? 'tablet' : 'scroll', { disk: false, scale: 1.1 }) +
-            '<b>' + esc(t('onboard.tier' + k)) + '</b><span>' + esc(T.blurb || '') + '</span>' +
-            (suggested === k ? '<em class="rec-tag">✓</em>' : '') + '</button>';
-        }).join('') + '</div>' +
-        '<p class="ob-hint">' + esc(t('onboard.changeLevel')) + ' · ' + esc(t('parent.levelHelp')) + '</p>';
+      body = '<h1 class="ob-q center">' + esc(t('onboard.age')) + '</h1>' +
+        '<p class="ob-hint center">' + esc(t('onboard.ageHint')) + '</p>' +
+        '<div class="age-grid">' + chips + '</div>' +
+        '<p class="tier-note">' + esc(t('onboard.tier' + L.tierForAge(ob.age))) + '</p>';
     }
     if (step === 'companion') {
-      body = '<h1 class="ob-q">' + esc(t('onboard.companion')) + '</h1><div class="comp-grid">' +
+      if (!ob.compName) ob.compName = petGuess(ob.compType);
+      body = '<h1 class="ob-q center">' + esc(t('onboard.companion')) + '</h1>' +
+        '<p class="ob-hint center">' + esc(t('onboard.companionHint')) + '</p>' +
+        '<div class="comp-grid">' +
         Object.keys(L.COMPANIONS).map(function (k) {
           return '<button class="comp-card' + (ob.compType === k ? ' on' : '') + '" data-act="ob-comp" data-arg="' + k + '">' +
-            Art.companion(k, 0, { skin: L.TIERS[ob.tier || 'L'].skin, scene: false }) + '<b>' + esc(L.COMPANIONS[k].name) + '</b></button>';
-        }).join('') + '</div>';
-    }
-    if (step === 'namepet') {
-      var guess = petGuess(ob.compType);
-      // the field is pre-filled, so the pre-fill has to be the value — otherwise
-      // Next looks tappable and does nothing until the child types
-      if (!ob.compName) ob.compName = guess;
-      body = '<div class="pet-preview">' + Art.companion(ob.compType, 0, { skin: 'young' }) + '</div>' +
-        '<h1 class="ob-q">' + esc(t('onboard.companionName')) + '</h1>' +
-        '<input class="big-input" data-ob="compName" value="' + esc(ob.compName || guess) + '" maxlength="18" data-focus />';
-    }
-    if (step === 'done') {
-      body = '<div class="ob-hero">' + Art.companion(ob.compType, 0, { skin: 'young' }) +
-        '<h1>' + esc(t('onboard.hello', { name: ob.name || 'Friend' })) + '</h1>' +
-        '<p>' + esc(t('home.level', { n: 1, title: L.levelTitle(1) })) + '</p>' +
-        '<button class="btn big primary" data-act="ob-finish" data-focus>' + esc(t('onboard.start')) + '</button>' +
-        (St.persistent ? '' : '<p class="muted-note ob-note">' + esc(t('sync.tabOnly')) + '</p>') + '</div>';
+            Art.companion(k, 0, { skin: L.TIERS[L.tierForAge(ob.age)].skin, scene: false }) +
+            '<b>' + esc(L.COMPANIONS[k].name) + '</b></button>';
+        }).join('') + '</div>' +
+        '<p class="ob-hint center">' + esc(t('onboard.companionName')) + '</p>' +
+        '<input class="big-input" data-ob="compName" value="' + esc(ob.compName) + '" maxlength="18" />';
     }
 
-    var nextDisabled = (step === 'name' && !ob.name) || (step === 'namepet' && !ob.compName);
+    var nextDisabled = (step === 'name' && !String(ob.name || '').trim()) ||
+      (step === 'companion' && !String(ob.compName || '').trim());
+    var nextLabel = step === 'companion' ? t('onboard.start') : t('player.next');
     return '<div class="onboard" data-skin="young">' + dots + '<div class="ob-body">' + body + '</div>' +
-      (['welcome', 'quiz', 'done'].indexOf(step) === -1
-        ? '<div class="ob-foot">' + (ob.step > 0 ? '<button class="btn ghost" data-act="ob-back">←</button>' : '') +
-        '<button class="btn primary big"' + (nextDisabled ? ' disabled' : '') + ' data-act="ob-next">' + esc(t('player.next')) + ' →</button></div>' : '') +
-      '</div>';
+      '<div class="ob-foot">' + (ob.step > 0 ? '<button class="btn ghost" data-act="ob-back">←</button>' : '<span></span>') +
+      '<button class="btn primary big"' + (nextDisabled ? ' disabled' : '') + ' data-act="ob-next" data-focus>' +
+      esc(nextLabel) + (step === 'companion' ? '' : ' →') + '</button></div></div>';
   }
 
   actions['ob-next'] = function () {
-    var step = ob.step;
-    if (step === 0) { ob.step = 1; return paint(); }
-    if (step === 1) { if (!ob.name) return; ob.step = 2; return paint(); }
-    if (step === 2) { ob.tier = L.tierForAge(ob.age); ob.quizIndex = 0; ob.step = 3; return paint(); }
-    if (step === 3) { return paint(); }
-    if (step === 4) { ob.step = 5; return paint(); }
-    if (step === 5) { ob.step = 6; return paint(); }
-    if (step === 6) { ob.step = 7; return paint(); }
+    if (!ob) return;
+    if (ob.step === 0) {
+      if (!String(ob.name || '').trim()) return;
+      ob.name = String(ob.name).trim();
+      ob.step = 1;
+      return paint();
+    }
+    if (ob.step === 1) {
+      ob.tier = L.tierForAge(ob.age);
+      ob.step = 2;
+      return paint();
+    }
+    if (ob.step === 2) {
+      if (!String(ob.compName || '').trim()) return;
+      ob.compName = String(ob.compName).trim();
+      return finishOnboard();
+    }
   };
-  actions['ob-back'] = function () { if (ob.step > 0) { ob.step--; paint(); } };
-  actions['ob-age'] = function (a) { ob.age = parseInt(a, 10) || 6; paint(); };
-  actions['ob-answer'] = function (idx) { ob.answers[ob.quizIndex || 0] = parseInt(idx, 10); paint(); };
-  actions['ob-quiz-next'] = function () {
-    var i = ob.quizIndex || 0;
-    if (i >= L.PLACEMENT.length - 1) {
-      var sc = L.scorePlacement(ob.answers);
-      ob.tier = sc.suggested || L.tierForAge(ob.age);
-      ob.step = 4; ob.skipQuiz = true;
-    } else ob.quizIndex = i + 1;
-    paint();
-  };
-  actions['ob-quiz-back'] = function () { ob.quizIndex = Math.max(0, (ob.quizIndex || 0) - 1); paint(); };
-  actions['ob-skip-quiz'] = function () { ob.tier = L.tierForAge(ob.age); ob.step = 4; paint(); };
-  actions['ob-tier'] = function (k) { ob.tier = k; paint(); };
-  function petGuess(type) {
-    return { lamb: 'Pip', dove: 'Shilo', donkey: 'Colt', hen: 'Nula', ewe: 'Mika', camel: 'Rami', shepherd: 'Obed', lion: 'Asa' }[type] || 'Pip';
-  }
+  actions['ob-back'] = function () { if (ob && ob.step > 0) { ob.step--; paint(); } };
+  actions['ob-age'] = function (a) { ob.age = parseInt(a, 10) || 3; paint(); };
   actions['ob-comp'] = function (k) {
-    ob.compType = k; ob.step = 6;
-    if (!ob.compName) ob.compName = petGuess(k);
+    ob.compType = k;
+    ob.compName = petGuess(k);
     paint();
   };
-  actions['ob-finish'] = function () {
-    St.createProfile({ name: ob.name, age: ob.age, tier: ob.tier, companionType: ob.compType, companionName: ob.compName });
-    St.root.device.seenIntro = true; St.save();
-    ob = null; Sp.lang = I.LANGS.filter(function (x) { return x.code === I.lang; })[0] ? I.lang : 'en';
-    Sp.init();
-    go('home');
-    toast(t('home.dailyVerse') + ': ' + M.DAILY_VERSES[M.dailyVerseIndex(L.isoDay(new Date()))].ref);
-  };
+  actions['ob-finish'] = function () { finishOnboard(); };
 
   /* ============================================================
      HOME — three next steps, nothing else
@@ -330,8 +295,9 @@
   function modeLabel(u) { return u.mode === 'story' ? t('lib.story') : u.mode === 'lesson' ? t('lib.lesson') : t('lib.game'); }
   function brandCard() {
     var b = M.BRAND;
-    return '<div class="brand-card"><div class="bc-top">' + Art.logo(skin()) +
-      '<div><b>' + esc(b.parent) + '</b><span>' + esc(b.taglineShort) + '</span></div></div>' +
+    return '<div class="brand-card brand-card-center">' +
+      '<div class="bc-logo">' + Art.logo(skin()) + '</div>' +
+      '<div class="bc-copy"><b>' + esc(b.parent) + '</b><span>' + esc(b.taglineShort) + '</span></div>' +
       '<div class="bc-links">' + b.links.map(function (l) {
         return '<a class="bc-link" href="' + esc(l.url) + '" target="_blank" rel="noopener noreferrer">' + esc(l.label) + ' ↗</a>';
       }).join('') + '</div></div>';
@@ -494,14 +460,28 @@
 
     if (st.phase === 'story') {
       var page = pages[st.page] || [];
+      var youngStory = tier() === 'L';
       html += '<div class="read-bar"><button class="btn primary pill" data-act="narrate">' + ico('play') + '<span>' + esc(t('player.listen')) + '</span></button>' +
         '<button class="btn ghost pill" data-act="narrate-stop">' + ico('stop') + '</button>' +
-        '<label class="tog"><input type="checkbox" data-set="readAlong"' + (St.root.settings.readAlong ? ' checked' : '') + '/><span>' + esc(t('player.readAlong')) + '</span></label>' +
+        (youngStory ? '' : '<label class="tog"><input type="checkbox" data-set="readAlong"' + (St.root.settings.readAlong ? ' checked' : '') + '/><span>' + esc(t('player.readAlong')) + '</span></label>') +
         '<button class="btn ghost pill" data-act="rate-toggle">' + esc(t('player.speed')) + ' ×' + Sp.rate + '</button></div>';
-      html += '<div class="pages">' + page.map(function (para) { return paraHTML(para.t, 's' + para.i); }).join('') + '</div>';
-      if (u.scripture && u.scripture.length) {
-        html += '<div class="scripture"><b>' + esc(t('player.original')) + '</b>' +
-          u.scripture.map(function (s) { return '<p>“' + esc(s.text) + '” <span>' + esc(s.ref) + ' (WEB)</span></p>'; }).join('') + '</div>';
+      if (youngStory) {
+        var sceneKey = page[0] ? ('s' + page[0].i) : ('s' + st.page);
+        html += '<div class="story-theatre" data-skin="young">' +
+          '<div class="story-slide" key-scene="' + sceneKey + '">' +
+          Art.storyScene(u.id, st.page, { skin: 'young', total: pages.length }) +
+          '</div>' +
+          '<div class="listen-row" aria-hidden="true">' +
+          '<div class="listen-child">' + Art.listeningChild({ skin: 'young' }) + '</div>' +
+          '<div class="listen-bubble"><span class="eq" aria-hidden="true"><i></i><i></i><i></i><i></i></span>' +
+          '<b>' + esc(t('player.listening')) + '</b></div></div></div>';
+        html += '<div class="pages pages-young">' + page.map(function (para) { return paraHTML(para.t, 's' + para.i); }).join('') + '</div>';
+      } else {
+        html += '<div class="pages">' + page.map(function (para) { return paraHTML(para.t, 's' + para.i); }).join('') + '</div>';
+        if (u.scripture && u.scripture.length) {
+          html += '<div class="scripture"><b>' + esc(t('player.original')) + '</b>' +
+            u.scripture.map(function (s) { return '<p>“' + esc(s.text) + '” <span>' + esc(s.ref) + ' (WEB)</span></p>'; }).join('') + '</div>';
+        }
       }
       var toTeach = !!(u.teach && u.teach.length && tier() !== 'L');
       html += '<div class="page-nav">' +
@@ -513,7 +493,9 @@
       if (toTeach) {
         html += '<button class="btn linkbtn" data-act="phase" data-arg="quiz">' + esc(t('quiz.title')) + ' →</button>';
       }
-      App.afterPaint = function () { if (St.root.settings.narration && !st.autoPlayed) { st.autoPlayed = true; narrate(); } };
+      App.afterPaint = function () {
+        if (St.root.settings.narration && !st.autoPlayed) { st.autoPlayed = true; narrate(); }
+      };
       return html;
     }
 
@@ -595,8 +577,15 @@
   };
   actions['unit-start'] = function () { var st = App.unitState; st.phase = 'story'; st.t0 = Date.now(); paint(); };
   actions['unit-silent'] = function () { var st = App.unitState; st.phase = 'story'; St.setSetting('narration', false); Sp.enabled = false; paint(); };
-  actions['page-next'] = function () { var st = App.unitState; var u = unitById(st.unitId); st.page++; if (st.page >= paraPages(u).length) { st.page = paraPages(u).length - 1; } Sp.stop(); paint(); };
-  actions['page-back'] = function () { var st = App.unitState; st.page = Math.max(0, st.page - 1); Sp.stop(); paint(); };
+  actions['page-next'] = function () {
+    var st = App.unitState; var u = unitById(st.unitId);
+    st.page++; if (st.page >= paraPages(u).length) st.page = paraPages(u).length - 1;
+    st.autoPlayed = false; Sp.stop(); paint();
+  };
+  actions['page-back'] = function () {
+    var st = App.unitState; st.page = Math.max(0, st.page - 1);
+    st.autoPlayed = false; Sp.stop(); paint();
+  };
   actions['phase'] = function (ph) { Sp.stop(); var st = App.unitState; st.phase = ph; paint(); };
   actions['open-unit'] = function (id) { App.unitState = null; go('unit', id); };
   actions['pray-unit'] = function () {

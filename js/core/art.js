@@ -243,6 +243,273 @@
     return svg(g, { label: name, cls: 'art art-motif' + (opts.cls ? ' ' + opts.cls : '') });
   }
 
+
+  /* ---------- story theatre (tier L) — big cartoon slides a 3-year-old can "read" ---------- */
+  function sky(P, night) {
+    var g = '';
+    if (night) {
+      g += r(0, 0, 100, 70, '#1e2a4a');
+      g += c(78, 18, 8, '#f4e9c2');
+      for (var i = 0; i < 10; i++) g += c(10 + (i * 9) % 70, 8 + (i * 7) % 28, 1.1, '#fff8d6');
+    } else {
+      g += r(0, 0, 100, 70, '#b7e0f5');
+      g += c(82, 18, 10, P.a);
+    }
+    g += r(0, 68, 100, 32, night ? '#2f4a3a' : '#8fbf6e');
+    return g;
+  }
+  function kidFigure(P, x, y, scale) {
+    scale = scale || 1;
+    var g = '<g transform="translate(' + x + ',' + y + ') scale(' + scale + ')">';
+    g += c(0, -18, 7, '#f2c9a0', 'stroke="' + P.ink + '" stroke-width="1.4"');
+    g += p('M-8 -8 q8 -6 16 0 v18 q-8 6 -16 0 z', P.d, 'stroke="' + P.ink + '" stroke-width="1.4"');
+    g += ln(-5, 12, -5, 24, P.ink, 2) + ln(5, 12, 5, 24, P.ink, 2);
+    g += eye(-2.5, -19, 1.3) + eye(2.5, -19, 1.3);
+    g += p('M-2 -14 q2 2 4 0', 'none', 'stroke="' + P.ink + '" stroke-width="1.2"');
+    g += '</g>';
+    return g;
+  }
+  function narratorFigure(P, x, y) {
+    var g = '<g transform="translate(' + x + ',' + y + ')">';
+    g += c(0, -22, 8, '#f2c9a0', 'stroke="' + P.ink + '" stroke-width="1.5"');
+    g += p('M-12 -10 q12 -8 24 0 v22 q-12 8 -24 0 z', P.c, 'stroke="' + P.ink + '" stroke-width="1.5"');
+    g += eye(-3, -23, 1.5) + eye(3, -23, 1.5);
+    g += p('M-3 -17 q3 3 6 0', 'none', 'stroke="' + P.ink + '" stroke-width="1.3"');
+    // open book
+    g += p('M-14 6 l14 -4 l14 4 l-14 8 z', '#fff6df', 'stroke="' + P.ink + '" stroke-width="1.4"');
+    g += ln(0, 2, 0, 14, P.ink, 1.2);
+    g += '</g>';
+    return g;
+  }
+  function listeningChild(opts) {
+    opts = opts || {};
+    var P = pal(opts.skin || 'young');
+    var g = r(0, 0, 100, 100, '#ffe8c2');
+    g += r(8, 58, 84, 34, '#f4d9a8', 10, 'stroke="' + P.ink + '" stroke-width="1.5"');
+    g += kidFigure(P, 50, 62, 1.35);
+    // headphones / listening arcs
+    g += p('M34 48 q-10 -6 -6 -18', 'none', 'stroke="' + P.c + '" stroke-width="2.4" stroke-linecap="round"');
+    g += p('M66 48 q10 -6 6 -18', 'none', 'stroke="' + P.c + '" stroke-width="2.4" stroke-linecap="round"');
+    g += c(32, 48, 5, P.c, 'stroke="' + P.ink + '" stroke-width="1.2"');
+    g += c(68, 48, 5, P.c, 'stroke="' + P.ink + '" stroke-width="1.2"');
+    return svg(g, { label: 'child listening', cls: 'art art-listen' });
+  }
+
+  // Per-unit slide recipes: each entry is a function(P, pageIndex) → svg guts
+  var STORY_SCENES = {
+    creation: function (P, i) {
+      var g = sky(P, i === 0);
+      if (i === 0) {
+        g += c(50, 36, 14, P.a, 'stroke="' + P.ink + '" stroke-width="2"');
+        g += p('M36 36 q14 -16 28 0 q-14 10 -28 0', '#fff6c8', 'opacity=".7"');
+      } else if (i === 1) {
+        g = sky(P, false);
+        g += r(0, 0, 50, 70, '#ffe9a8');
+        g += r(50, 0, 50, 70, '#1e2a4a');
+        g += c(25, 22, 10, P.a);
+        g += c(75, 22, 8, '#f4e9c2');
+        g += txt(25, 58, 'DAY', 8, P.ink);
+        g += txt(75, 58, 'NIGHT', 8, '#f4e9c2');
+      } else if (i === 2) {
+        g = sky(P, false);
+        g += r(0, 55, 100, 45, '#6db3d8');
+        g += r(0, 62, 100, 38, '#8fbf6e');
+        g += MOTIF.tree(P);
+        g += c(18, 78, 5, P.d) + c(30, 82, 4, P.a);
+      } else if (i === 3) {
+        g = sky(P, false);
+        g += c(78, 18, 11, P.a);
+        g += c(22, 22, 7, '#f4e9c2');
+        for (var k = 0; k < 10; k++) g += c(10 + k * 9, 12 + (k % 3) * 7, 1.5 + (k % 2), '#fff8d6');
+        g += e(28, 78, 10, 5, P.c, 'stroke="' + P.ink + '"') + e(52, 82, 8, 4, P.c, 'stroke="' + P.ink + '"');
+        g += c(74, 68, 5, '#fff', 'stroke="' + P.ink + '"');
+        g += p('M74 64 q10 -12 4 -2', '#fff', 'stroke="' + P.ink + '" stroke-width="1.4"');
+      } else if (i === 4) {
+        g = sky(P, false);
+        g += kidFigure(P, 38, 70, 1.2);
+        g += kidFigure(P, 62, 70, 1.2);
+        g += c(50, 28, 10, P.a, 'stroke="' + P.ink + '"');
+        g += p('M40 28 q10 -12 20 0 q-10 8 -20 0', '#fff6c8', 'opacity=".75"');
+      } else {
+        g = sky(P, false);
+        g += r(18, 40, 64, 36, '#fff6df', 10, 'stroke="' + P.ink + '" stroke-width="2"');
+        g += c(50, 30, 12, P.a);
+        g += txt(50, 62, 'REST', 10, P.ink);
+      }
+      return g;
+    },
+    garden: function (P, i) {
+      var g = sky(P, false);
+      g += MOTIF.tree(P);
+      if (i === 0) {
+        g += c(22, 78, 6, P.d) + c(78, 80, 5, P.a);
+      } else if (i === 1) {
+        g += kidFigure(P, 50, 78, 1.1);
+      } else if (i === 2) {
+        g += p('M20 70 q30 -40 60 0', 'none', 'stroke="' + P.b + '" stroke-width="4"');
+        g += c(50, 48, 6, P.d, 'stroke="' + P.ink + '"');
+      } else {
+        g += c(50, 40, 14, P.a, 'opacity=".35"');
+        g += kidFigure(P, 50, 78, 1);
+      }
+      return g;
+    },
+    noah: function (P, i) {
+      var g = '';
+      if (i <= 1) {
+        g = sky(P, false);
+        g += MOTIF.ark(P);
+        if (i === 1) {
+          g += c(22, 78, 5, '#c9a07a') + c(78, 80, 5, '#ddd'); // animals
+          g += e(30, 82, 6, 3, P.c);
+        }
+      } else if (i === 2) {
+        g = r(0, 0, 100, 100, '#4a6d8c');
+        g += MOTIF.ark(P);
+        g += p('M0 70 q20 8 40 0 q20 -8 40 0 q10 4 20 0 v30 h-100 z', '#3d6b8c');
+      } else if (i === 3) {
+        g = r(0, 0, 100, 55, '#7aa0c2');
+        g += r(0, 50, 100, 50, '#3d6b8c');
+        g += MOTIF.ark(P);
+        for (var rdrop = 0; rdrop < 12; rdrop++) g += ln(8 + rdrop * 8, 8, 5 + rdrop * 8, 22, '#d7e9f7', 1.6);
+      } else if (i === 4) {
+        g = sky(P, false);
+        g += MOTIF.ark(P);
+        g += c(70, 30, 4, '#fff') + p('M70 34 l0 8', P.ink) + c(74, 42, 3, P.b); // bird + leaf
+      } else {
+        g = sky(P, false);
+        g += MOTIF.ark(P);
+        // rainbow arcs
+        g += p('M10 55 q40 -50 80 0', 'none', 'stroke="#f28482" stroke-width="3" fill="none"');
+        g += p('M14 58 q36 -44 72 0', 'none', 'stroke="#f9c74f" stroke-width="3" fill="none"');
+        g += p('M18 61 q32 -38 64 0', 'none', 'stroke="#90be6d" stroke-width="3" fill="none"');
+      }
+      return g;
+    },
+    'abraham-stars': function (P, i) {
+      var g = sky(P, i >= 1);
+      if (i === 0) g += kidFigure(P, 50, 78, 1.15);
+      if (i >= 1) {
+        for (var s = 0; s < 18; s++) g += c(8 + (s * 17) % 90, 10 + (s * 11) % 40, 1.3 + (s % 3) * 0.4, '#fff8d6');
+      }
+      if (i >= 2) g += kidFigure(P, 50, 80, 1.1);
+      if (i >= 3) g += c(50, 28, 10, P.a, 'opacity=".4"');
+      return g;
+    },
+    samuel: function (P, i) {
+      var g = sky(P, i >= 1 && i <= 3);
+      g += r(20, 40, 60, 40, '#e8dcc6', 6, 'stroke="' + P.ink + '" stroke-width="2"'); // room / temple
+      g += kidFigure(P, 50, 70, 1.1);
+      if (i >= 1) {
+        // voice waves
+        g += p('M20 28 q15 -10 30 0', 'none', 'stroke="' + P.a + '" stroke-width="2.5" fill="none"');
+        g += p('M25 34 q12 -8 24 0', 'none', 'stroke="' + P.a + '" stroke-width="2" fill="none"');
+      }
+      if (i >= 4) g += c(50, 24, 8, P.a, 'opacity=".5"');
+      return g;
+    },
+    'david-shepherd': function (P, i) {
+      var g = sky(P, false);
+      g += r(0, 70, 100, 30, '#9ccf7a');
+      // sheep
+      g += c(30, 78, 7, '#fff') + c(28, 74, 4, '#fff') + c(50, 80, 6, '#fff') + c(70, 78, 7, '#fff');
+      if (i >= 1) g += kidFigure(P, 55, 68, 1);
+      if (i >= 2) {
+        g += ln(62, 60, 78, 48, P.ink, 2);
+        g += c(80, 46, 3, P.a); // sling stone path
+      }
+      if (i >= 3) g += MOTIF.star(P);
+      return g;
+    },
+    jonah: function (P, i) {
+      var g = '';
+      if (i === 0) {
+        g = sky(P, false);
+        g += r(0, 60, 100, 40, '#6db3d8');
+        g += kidFigure(P, 40, 70, 1);
+        g += p('M55 55 q30 0 35 20', 'none', 'stroke="' + P.ink + '" stroke-width="2"'); // path away
+      } else if (i === 1 || i === 2) {
+        g = sky(P, false);
+        g += r(0, 55, 100, 45, '#3d6b8c');
+        g += p('M20 60 q20 -18 40 0 l-6 14 q-14 4 -28 0 z', '#a9743f', 'stroke="' + P.ink + '"'); // boat
+        if (i === 2) for (var w = 0; w < 5; w++) g += p('M' + (10 + w * 18) + ' 70 q8 8 16 0', 'none', 'stroke="#d7e9f7" stroke-width="2"');
+      } else if (i === 3 || i === 4) {
+        g = r(0, 0, 100, 100, '#1b4a5e');
+        g += MOTIF.fish(P);
+        if (i === 4) g += kidFigure(P, 48, 52, 0.7);
+      } else {
+        g = sky(P, false);
+        g += r(0, 60, 100, 40, '#6db3d8');
+        g += kidFigure(P, 50, 70, 1.1);
+        g += c(50, 28, 10, P.a, 'opacity=".45"');
+      }
+      return g;
+    },
+    'daniel-lions': function (P, i) {
+      var g = '';
+      if (i <= 1) {
+        g = sky(P, false);
+        g += r(25, 35, 50, 45, '#d9cbb3', 4, 'stroke="' + P.ink + '"');
+        g += kidFigure(P, 50, 62, 1);
+        if (i === 1) g += p('M20 30 q15 -12 30 0', 'none', 'stroke="' + P.a + '" stroke-width="2.5" fill="none"');
+      } else if (i === 2 || i === 3) {
+        g = r(0, 0, 100, 100, '#3a342c');
+        g += r(15, 20, 70, 70, '#2a2520', 8, 'stroke="' + P.ink + '" stroke-width="2"'); // den
+        g += kidFigure(P, 50, 55, 1);
+        g += MOTIF.lion(P);
+        if (i === 3) {
+          // calm hearts
+          g += c(28, 30, 3, P.d) + c(72, 28, 3, P.d);
+        }
+      } else {
+        g = sky(P, false);
+        g += kidFigure(P, 50, 70, 1.15);
+        g += c(50, 28, 12, P.a, 'opacity=".4"');
+        g += MOTIF.star(P);
+      }
+      return g;
+    },
+    lights: function (P, i) {
+      var g = sky(P, i % 2 === 1);
+      g += c(50, 40, 16, P.a);
+      for (var n = 0; n < 6; n++) g += c(20 + n * 12, 18, 1.5, '#fff8d6');
+      return g;
+    },
+    rainbow: function (P, i) {
+      var g = sky(P, false);
+      g += p('M10 60 q40 -55 80 0', 'none', 'stroke="#f28482" stroke-width="4" fill="none"');
+      g += p('M14 63 q36 -48 72 0', 'none', 'stroke="#f9c74f" stroke-width="4" fill="none"');
+      g += p('M18 66 q32 -42 64 0', 'none', 'stroke="#90be6d" stroke-width="4" fill="none"');
+      g += p('M22 69 q28 -36 56 0', 'none', 'stroke="#577590" stroke-width="4" fill="none"');
+      if (i >= 2) g += kidFigure(P, 50, 78, 1);
+      return g;
+    }
+  };
+
+  function storyScene(unitId, pageIndex, opts) {
+    opts = opts || {};
+    var P = pal(opts.skin || 'young');
+    var fn = STORY_SCENES[unitId];
+    var g = '';
+    // soft frame
+    g += r(1, 1, 98, 98, P.bg, 8, 'stroke="' + P.ink + '" stroke-width="2"');
+    if (fn) {
+      g += '<g transform="translate(0,0)">' + fn(P, pageIndex || 0) + '</g>';
+    } else {
+      // generic friendly scene + motif
+      g += sky(P, false);
+      g += '<g transform="translate(50,48) scale(0.9) translate(-50,-50)">' + (MOTIF.scroll(P)) + '</g>';
+      g += kidFigure(P, 78, 78, 0.85);
+    }
+    // page pips
+    var total = opts.total || 1;
+    var pi = pageIndex || 0;
+    for (var d = 0; d < Math.min(total, 8); d++) {
+      g += c(50 - (Math.min(total, 8) - 1) * 4 + d * 8, 94, d === pi ? 2.4 : 1.6, d === pi ? P.a : '#cfc3b0');
+    }
+    return svg(g, { vb: '0 0 100 100', label: 'story picture', cls: 'art art-story-scene' });
+  }
+
   /* ---------- logo: a little ship under a cross-sail ---------- */
   function logo(P0) {
     var P = pal(P0 || 'mid');
@@ -367,7 +634,8 @@
   var Art = {
     PAL: PAL, pal: pal, companion: companion, motif: motif, MOTIF: MOTIF, logo: logo,
     garden: garden, bars: bars, donut: donut, spark: spark, colouringPage: colouringPage,
-    reaction: reaction, ring: ring, esc: esc
+    reaction: reaction, ring: ring, storyScene: storyScene, listeningChild: listeningChild,
+    esc: esc
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = Art;
   root.SS_Art = Art;
