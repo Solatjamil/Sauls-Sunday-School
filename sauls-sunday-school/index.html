@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en" dir="ltr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=5">
+<title>Saul’s Sunday School — free Bible learning for ages 3–12</title>
+<meta name="description" content="A free, ad-free Bible learning app for kids 3–12 from Saul’s Podship: narrated stories, quizzes, games, memory verses, prayer and a parent dashboard.">
+<meta name="theme-color" content="#f2a13b">
+<meta name="color-scheme" content="light">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Sunday School">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="assets/icons/favicon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="assets/icons/apple-touch-icon.png">
+<link rel="stylesheet" href="css/app.css">
+</head>
+<body>
+<div id="root" aria-live="polite"></div>
+<noscript><div style="font-family:system-ui;padding:24px;max-width:36rem;margin:0 auto">
+<h1>Saul’s Sunday School</h1>
+<p>This app needs JavaScript turned on. It is completely free and ad-free — nothing is downloaded except the app itself.</p>
+</div></noscript>
+
+<!-- data, then core, then app -->
+<script src="js/core/logic.js"></script>
+<script src="js/core/i18n.js"></script>
+<script src="js/data/meta.js"></script>
+<script src="js/data/units-1.js"></script>
+<script src="js/data/units-2.js"></script>
+<script src="js/data/units-3.js"></script>
+<script src="js/data/units-4.js"></script>
+<script src="js/data/units-5.js"></script>
+<script src="js/data/units-6.js"></script>
+<script src="js/data/audio.js"></script>
+<script src="js/core/store.js"></script>
+<script src="js/core/art.js"></script>
+<script src="js/core/speech.js"></script>
+<script src="js/core/sync.js"></script>
+<script src="js/app.js"></script>
+<script src="js/app2.js"></script>
+<script>
+  window.addEventListener('load', function () {
+    SS_App.boot({ logic: SS_Logic, i18n: SS_I18n, store: SS_Store, art: SS_Art, speech: SS_Speech, sync: SS_Sync, meta: SS_META });
+  });
+</script>
+</body>
+</html>

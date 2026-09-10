@@ -1,0 +1,45 @@
+{
+  "name": "sauls-sunday-school",
+  "version": "0.9.0",
+  "private": true,
+  "description": "Saul's Sunday School \u2014 a free, ad-free Bible learning app for ages 3-12 (web + Android). A ministry project from Saul's Podship.",
+  "license": "UNLICENSED",
+  "scripts": {
+    "validate": "node tools/validate.mjs",
+    "build": "node build.js",
+    "test:logic": "node tools/test-logic.mjs",
+    "test:art": "node tools/test-art.mjs",
+    "test:dom": "node tools/test-dom.mjs",
+    "test:tiers": "node tools/test-dom-tiers.mjs",
+    "test": "npm run test:logic && npm run test:art && node build.js && npm run test:dom && npm run test:tiers && npm run test:print && npm run test:live && npm run test:nostore",
+    "check": "node tools/validate.mjs && npm run audio && npm run test",
+    "print": "node tools/build-print.mjs",
+    "serve": "node tools/serve.js",
+    "serve:dist": "node tools/serve.js dist",
+    "cap:add:android": "npx cap add android",
+    "cap:sync": "npx cap sync android",
+    "cap:open:android": "npx cap open android",
+    "android:apk": "cd android && ./gradlew assembleDebug",
+    "test:live": "node tools/test-live.mjs",
+    "test:nostore": "node tools/test-dom-nostore.mjs",
+    "audio": "node tools/build-audio.mjs",
+    "test:print": "node tools/test-print.mjs"
+  },
+  "dependencies": {
+    "@capacitor/android": "^6.2.0",
+    "@capacitor/app": "^6.0.2",
+    "@capacitor/core": "^6.2.0",
+    "@capacitor/preferences": "^6.0.3",
+    "@capacitor/share": "^6.0.3"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "^6.2.0",
+    "jsdom": "^25.0.1"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "optionalDependencies": {
+    "@resvg/resvg-js": "^2.6.2"
+  }
+}

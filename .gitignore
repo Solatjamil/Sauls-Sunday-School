@@ -1,0 +1,21 @@
+# Dependencies
+node_modules/
+**/node_modules/
+
+# Build and distribution outputs
+dist/
+**/dist/
+
+# Platform builds
+android/
+**/android/
+
+# Logs and environment
+*.log
+.DS_Store
+Thumbs.db
+.env
+.env.local
+
+# Temp tools
+tools/fail.html

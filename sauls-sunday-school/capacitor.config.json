@@ -1,0 +1,22 @@
+{
+  "appId": "com.saulspodship.sundaychool",
+  "appName": "Saul's Sunday School",
+  "webDir": "dist",
+  "bundledWebRuntime": false,
+  "backgroundColor": "#fdf6e9",
+  "android": {
+    "allowMixedContent": false,
+    "captureInput": true,
+    "webContentsDebuggingEnabled": false,
+    "backgroundColor": "#fdf6e9"
+  },
+  "server": {
+    "androidScheme": "https",
+    "cleartext": false
+  },
+  "plugins": {
+    "PushNotifications": { "_comment": "optional; the app never pushes on its own — reminders are local and opt-in" },
+    "SplashScreen": { "launchShowDuration": 900, "backgroundColor": "#f2a13b", "showSpinner": false, "splashFullScreen": true },
+    "Keyboard": { "resize": "body" }
+  }
+}

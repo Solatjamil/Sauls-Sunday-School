@@ -1,0 +1,32 @@
+{
+  "name": "Saul's Sunday School — free Bible learning for ages 3-12",
+  "short_name": "Sunday School",
+  "description": "A free, ad-free ministry app from Saul's Podship: narrated Bible stories, lessons and quizzes, games, memory verses, prayer journal and a parent dashboard. Works offline.",
+  "id": "com.saulspodship.sundaychool",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#fdf6e9",
+  "theme_color": "#f2a13b",
+  "lang": "en",
+  "dir": "auto",
+  "categories": ["education", "kids", "religion"],
+  "icons": [
+    { "src": "assets/icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "assets/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "assets/icons/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ],
+  "shortcuts": [
+    { "name": "Continue my path", "short_name": "My path", "url": "./index.html#/path" },
+    { "name": "Memory verses", "short_name": "Verses", "url": "./index.html#/verses" },
+    { "name": "Prayer list", "short_name": "Pray", "url": "./index.html#/pray" },
+    { "name": "Grown-ups", "short_name": "Grown-ups", "url": "./index.html#/parent" }
+  ],
+  "screenshots": [],
+  "protocol_handlers": [],
+  "related_applications": [
+    { "platform": "play", "url": "https://play.google.com/store/apps/details?id=com.saulspodship.sundaychool", "id": "com.saulspodship.sundaychool" }
+  ],
+  "prefer_related_applications": false
+}
