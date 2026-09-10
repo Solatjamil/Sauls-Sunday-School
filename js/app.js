@@ -533,7 +533,11 @@
         html += '<button class="btn linkbtn" data-act="phase" data-arg="quiz">' + esc(t('quiz.title')) + ' →</button>';
       }
       App.afterPaint = function () {
-        if (St.root.settings.narration && !st.autoPlayed) { st.autoPlayed = true; narrate(); }
+        if (St.root.settings.narration !== false && !st.autoPlayed) {
+          st.autoPlayed = true;
+          if (Sp.ensureOn) Sp.ensureOn(); else Sp.enabled = true;
+          narrate();
+        }
       };
       return html;
     }
@@ -595,22 +599,26 @@
     var u = unitById(st.unitId);
     var paras = document.querySelectorAll('.para');
     if (!paras.length) return;
+    // Always turn voice back on when Listen is pressed (undo "Read quietly")
+    St.setSetting('narration', true);
+    if (Sp.ensureOn) Sp.ensureOn(); else { Sp.enabled = true; }
     var nl = narrLang();
-    var bcp = (root.SS_StoryI18n && root.SS_Speech && Sp.bcp47) ? Sp.bcp47(nl) : ({ en: 'en-GB', ur: 'ur-PK', hi: 'hi-IN', ar: 'ar-SA' }[nl] || 'en-GB');
+    var bcp = (Sp.bcp47 ? Sp.bcp47(nl) : ({ en: 'en-GB', ur: 'ur-PK', hi: 'hi-IN', ar: 'ar-SA' }[nl] || 'en-GB'));
     Sp.lang = nl;
     var idx = 0;
     function speakOne() {
       if (idx >= paras.length) { Sp.stop(); return; }
       var elx = paras[idx];
       var text = Array.prototype.map.call(elx.querySelectorAll('.w'), function (w) { return w.textContent; }).join(' ');
-      // Recorded audio only when narration language matches UI pack language
+      if (!text || !String(text).trim()) { idx++; setTimeout(speakOne, 40); return; }
       var url = Sp.hasAudioFor(u, nl, elx.getAttribute('data-para'));
       Sp.speakElement(elx, text, {
         lang: bcp, langCode: nl, audio: url,
         onDone: function () { idx++; setTimeout(speakOne, 280); }
       });
     }
-    speakOne();
+    // Tiny delay lets stop()/cancel settle before the next utterance (Chrome)
+    setTimeout(speakOne, 40);
   }
   actions['narrate'] = function () { narrate(); };
   actions['narrate-stop'] = function () { Sp.stop(); };
@@ -618,6 +626,9 @@
     var ok = { en: 1, ur: 1, hi: 1, ar: 1 };
     if (!ok[code]) return;
     St.setSetting('narrLang', code);
+    // Switching language always re-enables voice — child expects to hear the new tongue
+    St.setSetting('narration', true);
+    if (Sp.ensureOn) Sp.ensureOn(); else Sp.enabled = true;
     Sp.lang = code;
     Sp.voiceURI = null; // allow auto-pick of a mother-tongue voice
     St.setSetting('voice', null);
@@ -630,8 +641,27 @@
     Sp.rate = Sp.rate >= 1.3 ? 0.8 : Math.round((Sp.rate + 0.2) * 10) / 10;
     St.setSetting('rate', Sp.rate); paint();
   };
-  actions['unit-start'] = function () { var st = App.unitState; st.phase = 'story'; st.t0 = Date.now(); paint(); };
-  actions['unit-silent'] = function () { var st = App.unitState; st.phase = 'story'; St.setSetting('narration', false); Sp.enabled = false; paint(); };
+  actions['unit-start'] = function () {
+    var st = App.unitState;
+    st.phase = 'story';
+    st.t0 = Date.now();
+    st.autoPlayed = false;
+    // Starting a story with the main button turns voice back on
+    St.setSetting('narration', true);
+    if (Sp.ensureOn) Sp.ensureOn(); else Sp.enabled = true;
+    paint();
+  };
+  actions['unit-silent'] = function () {
+    var st = App.unitState;
+    st.phase = 'story';
+    st.t0 = Date.now();
+    st.autoPlayed = true; // don't auto-speak this opening
+    // Quiet mode for now — Listen / language chip / Start will turn voice back on
+    St.setSetting('narration', false);
+    Sp.enabled = false;
+    Sp.stop();
+    paint();
+  };
   actions['page-next'] = function () {
     var st = App.unitState; var u = unitById(st.unitId);
     st.page++; if (st.page >= paraPages(u).length) st.page = paraPages(u).length - 1;
@@ -989,7 +1019,11 @@
       if (n.matches('[data-set]')) {
         var k = n.getAttribute('data-set');
         if (k === 'readAlong') St.setSetting('readAlong', n.checked);
-        if (k === 'narration') { St.setSetting('narration', n.checked); Sp.enabled = n.checked; if (!n.checked) Sp.stop(); }
+        if (k === 'narration') {
+          St.setSetting('narration', n.checked);
+          if (n.checked) { if (Sp.ensureOn) Sp.ensureOn(); else Sp.enabled = true; }
+          else { Sp.enabled = false; Sp.stop(); }
+        }
       }
       if (n.matches('[data-setting]')) {
         var k2 = n.getAttribute('data-setting');

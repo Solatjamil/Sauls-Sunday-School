@@ -23,14 +23,15 @@
       if (!synth) return;
       var grab = function () {
         try {
-          Speech.voices = (synth.getVoices() || []).filter(function (v) { return /^en|^ur/i.test(v.lang); });
-          if (!Speech.voices.length) Speech.voices = synth.getVoices() || [];
+          // Keep the full list so Hindi/Arabic/Urdu voices are available.
+          // Language preference is applied in pickVoice(), not here.
+          Speech.voices = synth.getVoices() || [];
         } catch (e) { Speech.voices = []; }
       };
       grab();
       try { synth.onvoiceschanged = grab; } catch (e) { }
-      // some engines only list voices a moment later
-      setTimeout(grab, 250); setTimeout(grab, 1200);
+      // some engines only list voices a moment later (Chrome especially)
+      setTimeout(grab, 250); setTimeout(grab, 800); setTimeout(grab, 2000);
     },
     /* Which recording belongs to this paragraph?
        Resolution order, so a half-recorded unit still reads out loud:
@@ -39,7 +40,7 @@
          3. null — the caller falls back to the device voice          */
     hasAudioFor: function (unit, lang, key) {
       if (!unit) return null;
-      var l = (lang === 'ur') ? 'ur' : 'en';
+      var l = (lang === 'ur' || lang === 'hi' || lang === 'ar') ? lang : 'en';
       var pack = root.SS_AUDIO && root.SS_AUDIO[unit.id];
       if (pack) {
         var fromPack = pack[l] || pack.en;
@@ -59,8 +60,20 @@
     stop: function () {
       if (queue && queue.timer) { clearTimeout(queue.timer); queue.timer = null; }
       if (Speech.audioEl) { try { Speech.audioEl.pause(); Speech.audioEl.currentTime = 0; } catch (e) { } }
-      if (synth) { try { synth.cancel(); } catch (e) { } }
+      if (synth) {
+        try { synth.cancel(); } catch (e) { }
+        // Chrome often leaves synthesis "paused" after cancel — unlock for next speak
+        try { if (synth.paused) synth.resume(); } catch (e2) { }
+      }
       queue = null;
+    },
+    // Always turn voice back on when the child (or parent) asks to listen
+    ensureOn: function () {
+      Speech.enabled = true;
+      if (!Speech.voices || !Speech.voices.length) Speech.init();
+      if (synth) {
+        try { if (synth.paused) synth.resume(); } catch (e) { }
+      }
     },
     pause: function () { try { if (synth) synth.pause(); } catch (e) { } if (Speech.audioEl) { try { Speech.audioEl.pause(); } catch (e) { } } },
     resume: function () { try { if (synth) synth.resume(); } catch (e) { } if (Speech.audioEl) { try { Speech.audioEl.play(); } catch (e) { } } },
@@ -126,18 +139,28 @@
         return { mode: 'audio' };
       }
 
-      if (!Speech.enabled || !synth) {                        // silent read mode
+      // Force-on path: Listen button / auto-narrate always wants real voice.
+      // Only stay silent when explicitly requested (opts.forceSilent) or no engine.
+      if (opts.forceSilent || (!synth && opts.allowSilentHighlight !== false)) {
         if (opts.allowSilentHighlight === false) { if (state.onDone) state.onDone(); return { mode: 'none' }; }
         var i = 0;
         var step = function () {
           if (!queue || queue !== state) return;
           if (i >= words.length) { setIdx(-1); if (state.onDone) state.onDone(); return; }
           setIdx(i++);
-          state.timer = setTimeout(step, (60000 / Speech.WPM) / Speech.rate);
+          state.timer = setTimeout(step, (60000 / Speech.WPM) / Math.max(0.5, Speech.rate || 1));
         };
         step();
         return { mode: 'timed' };
       }
+
+      if (!synth) {
+        if (state.onDone) state.onDone();
+        return { mode: 'none' };
+      }
+
+      // Re-enable after "Read quietly" and unlock paused engines
+      Speech.ensureOn();
 
       var u = new SpeechSynthesisUtterance(text);
       var langCode = opts.langCode || Speech.lang || 'en';
@@ -147,9 +170,22 @@
       u.pitch = (opts.pitch != null ? opts.pitch : pro.pitch);
       u.volume = 1;
       var v = Speech.pickVoice(langCode);
-      if (v) { try { u.voice = v; } catch (e) { } }
+      if (v) {
+        try { u.voice = v; } catch (e) { }
+        // Keep utterance lang aligned with the chosen voice when possible
+        if (v.lang) {
+          try { u.lang = v.lang; } catch (e2) { }
+        }
+      }
 
       var gotBoundary = false;
+      var finished = false;
+      var finish = function () {
+        if (finished) return;
+        finished = true;
+        setIdx(-1);
+        if (state.onDone) state.onDone();
+      };
       u.onboundary = function (ev) {
         if (ev && ev.name && ev.name !== 'word') return;
         gotBoundary = true;
@@ -158,10 +194,27 @@
         for (var k = 0; k < words.length; k++) { if (words[k].start <= ch) idx = k; else break; }
         setIdx(idx);
       };
-      u.onend = function () { setIdx(-1); if (state.onDone) state.onDone(); };
-      u.onerror = function () { setIdx(-1); if (state.onDone) state.onDone(); };
+      u.onend = function () { finish(); };
+      u.onerror = function () {
+        // If this voice failed, try once with any English fallback so the child still hears something
+        if (!opts._retried && langCode !== 'en') {
+          opts._retried = true;
+          try {
+            var o2 = {};
+            for (var ok in opts) o2[ok] = opts[ok];
+            o2.langCode = 'en'; o2.lang = 'en-GB'; o2.audio = null; o2._retried = true;
+            Speech.speakElement(el, text, o2);
+            return;
+          } catch (err) { }
+        }
+        finish();
+      };
       try { synth.cancel(); } catch (e) { }
-      try { synth.speak(u); } catch (e) { if (state.onDone) state.onDone(); return { mode: 'error' }; }
+      try { if (synth.paused) synth.resume(); } catch (e) { }
+      try { synth.speak(u); } catch (e) { finish(); return { mode: 'error' }; }
+      // Chrome bug: utterances stay queued while paused
+      try { if (synth.paused) synth.resume(); } catch (e) { }
+      setTimeout(function () { try { if (synth && synth.paused) synth.resume(); } catch (e) { } }, 60);
 
       // engines that never fire boundary events: fall back to a timer
       setTimeout(function () {
@@ -179,30 +232,36 @@
     },
     // Prefer a gentle, local parent-like voice for the active narration language.
     pickVoice: function (langHint) {
+      if (!Speech.voices || !Speech.voices.length) {
+        try { if (synth) Speech.voices = synth.getVoices() || []; } catch (e) { }
+      }
       if (!Speech.voices || !Speech.voices.length) return null;
       if (Speech.voiceURI) {
         var forced = Speech.voices.filter(function (v) { return v.voiceURI === Speech.voiceURI; })[0];
         if (forced) return forced;
       }
       var code = (langHint || Speech.lang || 'en').toLowerCase();
+      // Match by BCP-47 lang AND by common voice product names (Android/iOS/desktop)
       var prefs = {
-        en: [/^en-GB/i, /^en-IN/i, /^en-AU/i, /^en/i],
-        ur: [/^ur/i, /^hi/i, /^en-IN/i, /^en/i],
-        hi: [/^hi/i, /^en-IN/i, /^ur/i, /^en/i],
-        ar: [/^ar/i, /^ar-SA/i, /^ar-EG/i, /^en/i]
+        en: [/^en-GB/i, /^en-IN/i, /^en-AU/i, /^en-US/i, /^en/i, /english/i],
+        ur: [/^ur/i, /urdu/i, /^hi/i, /hindi/i, /^en-IN/i, /^en/i],
+        hi: [/^hi/i, /hindi/i, /veena|kalpana|lekha/i, /^en-IN/i, /^ur/i, /^en/i],
+        ar: [/^ar/i, /arabic/i, /naayf|maged|laila|tarik/i, /^en/i]
       };
       var tests = prefs[code] || prefs.en;
-      var i, list, soft;
+      var i, list, soft, v, hay;
       for (i = 0; i < tests.length; i++) {
-        list = Speech.voices.filter(function (v) { return tests[i].test(v.lang || '') || tests[i].test(v.name || ''); });
+        list = Speech.voices.filter(function (vv) {
+          hay = ((vv.lang || '') + ' ' + (vv.name || ''));
+          return tests[i].test(hay);
+        });
         if (!list.length) continue;
-        // Prefer female / softer-named voices when available (parent-to-child feel)
-        soft = list.filter(function (v) {
-          return /female|woman|girl|zira|samantha|veena|kalpana|lekha|nicky|anya|helen|google.*f/i.test(v.name || '');
+        soft = list.filter(function (vv) {
+          return /female|woman|girl|zira|samantha|veena|kalpana|lekha|nicky|anya|helen|google UK.*F|female/i.test(vv.name || '');
         });
         return (soft[0] || list[0]);
       }
-      return Speech.voices[0];
+      return Speech.voices[0] || null;
     },
     bcp47: function (code) {
       return ({ en: 'en-GB', ur: 'ur-PK', hi: 'hi-IN', ar: 'ar-SA' })[code] || 'en-GB';
