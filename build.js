@@ -14,6 +14,7 @@ const SRC_ORDER = [
   'js/data/units-1.js', 'js/data/units-2.js', 'js/data/units-3.js', 'js/data/units-4.js',
   'js/data/units-5.js', 'js/data/units-6.js',
   'js/data/audio.js',
+  'js/data/story-i18n.js',
   'js/core/store.js', 'js/core/art.js', 'js/core/speech.js', 'js/core/sync.js',
   'js/app.js', 'js/app2.js'
 ];

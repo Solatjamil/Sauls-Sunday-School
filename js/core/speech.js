@@ -140,10 +140,13 @@
       }
 
       var u = new SpeechSynthesisUtterance(text);
-      u.lang = opts.lang || Speech.lang === 'ur' ? (opts.lang || 'ur-PK') : 'en';
-      if (opts.lang) u.lang = opts.lang;
-      u.rate = Speech.rate; u.pitch = 1.02; u.volume = 1;
-      var v = Speech.pickVoice();
+      var langCode = opts.langCode || Speech.lang || 'en';
+      u.lang = opts.lang || Speech.bcp47(langCode);
+      var pro = Speech.kidProsody(langCode);
+      u.rate = (opts.rate != null ? opts.rate : pro.rate);
+      u.pitch = (opts.pitch != null ? opts.pitch : pro.pitch);
+      u.volume = 1;
+      var v = Speech.pickVoice(langCode);
       if (v) { try { u.voice = v; } catch (e) { } }
 
       var gotBoundary = false;
@@ -174,19 +177,55 @@
       }, 900);
       return { mode: 'speech' };
     },
-    pickVoice: function () {
+    // Prefer a gentle, local parent-like voice for the active narration language.
+    pickVoice: function (langHint) {
       if (!Speech.voices || !Speech.voices.length) return null;
-      if (Speech.voiceURI) { var m = Speech.voices.filter(function (v) { return v.voiceURI === Speech.voiceURI; })[0]; if (m) return m; }
-      var want = Speech.lang === 'ur' ? /^ur/i : /^en/i;
-      var list = Speech.voices.filter(function (v) { return want.test(v.lang || ''); });
-      return list[0] || Speech.voices[0];
+      if (Speech.voiceURI) {
+        var forced = Speech.voices.filter(function (v) { return v.voiceURI === Speech.voiceURI; })[0];
+        if (forced) return forced;
+      }
+      var code = (langHint || Speech.lang || 'en').toLowerCase();
+      var prefs = {
+        en: [/^en-GB/i, /^en-IN/i, /^en-AU/i, /^en/i],
+        ur: [/^ur/i, /^hi/i, /^en-IN/i, /^en/i],
+        hi: [/^hi/i, /^en-IN/i, /^ur/i, /^en/i],
+        ar: [/^ar/i, /^ar-SA/i, /^ar-EG/i, /^en/i]
+      };
+      var tests = prefs[code] || prefs.en;
+      var i, list, soft;
+      for (i = 0; i < tests.length; i++) {
+        list = Speech.voices.filter(function (v) { return tests[i].test(v.lang || '') || tests[i].test(v.name || ''); });
+        if (!list.length) continue;
+        // Prefer female / softer-named voices when available (parent-to-child feel)
+        soft = list.filter(function (v) {
+          return /female|woman|girl|zira|samantha|veena|kalpana|lekha|nicky|anya|helen|google.*f/i.test(v.name || '');
+        });
+        return (soft[0] || list[0]);
+      }
+      return Speech.voices[0];
+    },
+    bcp47: function (code) {
+      return ({ en: 'en-GB', ur: 'ur-PK', hi: 'hi-IN', ar: 'ar-SA' })[code] || 'en-GB';
+    },
+    // Slightly slower + warmer for kids in mother-tongue modes
+    kidProsody: function (code) {
+      var base = Speech.rate || 1;
+      if (code === 'ur' || code === 'hi' || code === 'ar') {
+        return { rate: Math.max(0.75, Math.min(1.05, base * 0.92)), pitch: 1.08 };
+      }
+      return { rate: base, pitch: 1.02 };
     },
     speakShort: function (text, lang) {
       if (!Speech.enabled || !synth) return;
       try {
+        var code = lang || Speech.lang || 'en';
+        // allow full bcp47 or short code
+        var short = String(code).split('-')[0];
         var u = new SpeechSynthesisUtterance(text);
-        u.rate = Speech.rate; if (lang) u.lang = lang;
-        var v = Speech.pickVoice(); if (v) { try { u.voice = v; } catch (e) { } }
+        u.lang = code.indexOf('-') > 0 ? code : Speech.bcp47(short);
+        var pro = Speech.kidProsody(short);
+        u.rate = pro.rate; u.pitch = pro.pitch;
+        var v = Speech.pickVoice(short); if (v) { try { u.voice = v; } catch (e) { } }
         synth.speak(u);
       } catch (e) { }
     }

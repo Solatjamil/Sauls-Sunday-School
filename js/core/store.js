@@ -33,7 +33,7 @@
         activeProfile: null, profiles: {},
         groups: [],                                 // {id,code,name,kind,orgId,members:[{name,xp,profileId,you}]}
         org: { status: 'none' },                    // none | pending | approved
-        settings: { lang: 'en', narration: true, readAlong: true, rate: 1, voice: null, silent: false },
+        settings: { lang: 'en', narrLang: 'en', narration: true, readAlong: true, rate: 1, voice: null, silent: false },
         device: { reactionState: { day: null, used: 0 }, lastNotifiedDay: null, peersDay: null, peers: [], seenIntro: false }
       };
     },

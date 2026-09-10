@@ -486,28 +486,60 @@
     }
   };
 
+  // Gentle cartoon motion helpers (SMIL) — slow, soft, not sharp
+  function bob(inner, dur, amp) {
+    dur = dur || 3.2; amp = amp || 1.4;
+    return '<g class="motion-bob">' + inner +
+      '<animateTransform attributeName="transform" type="translate" values="0 0; 0 -' + amp + '; 0 0; 0 ' + (amp * 0.6) + '; 0 0" keyTimes="0;0.25;0.5;0.75;1" dur="' + dur + 's" repeatCount="indefinite" calcMode="spline" keySplines="0.4 0 0.2 1;0.4 0 0.2 1;0.4 0 0.2 1;0.4 0 0.2 1"/></g>';
+  }
+  function sway(inner, dur, deg) {
+    dur = dur || 4.5; deg = deg || 2.2;
+    return '<g class="motion-sway" transform-origin="50 80">' + inner +
+      '<animateTransform attributeName="transform" type="rotate" values="-' + deg + ' 50 80; ' + deg + ' 50 80; -' + deg + ' 50 80" dur="' + dur + 's" repeatCount="indefinite" calcMode="spline" keySplines="0.37 0 0.63 1;0.37 0 0.63 1"/></g>';
+  }
+  function drift(inner, dur, dx) {
+    dur = dur || 6; dx = dx || 2;
+    return '<g class="motion-drift">' + inner +
+      '<animateTransform attributeName="transform" type="translate" values="0 0; ' + dx + ' 0; 0 0; -' + dx + ' 0; 0 0" dur="' + dur + 's" repeatCount="indefinite" calcMode="spline" keySplines="0.4 0 0.2 1;0.4 0 0.2 1;0.4 0 0.2 1;0.4 0 0.2 1"/></g>';
+  }
+  function twinkle(cx, cy, r, color, delay) {
+    return '<circle cx="' + cx + '" cy="' + cy + '" r="' + r + '" fill="' + (color || '#fff8d6') + '" opacity="0.85">' +
+      '<animate attributeName="opacity" values="0.35;1;0.35" dur="2.8s" begin="' + (delay || 0) + 's" repeatCount="indefinite"/>' +
+      '<animate attributeName="r" values="' + r + ';' + (r * 1.35) + ';' + r + '" dur="2.8s" begin="' + (delay || 0) + 's" repeatCount="indefinite"/></circle>';
+  }
+
   function storyScene(unitId, pageIndex, opts) {
     opts = opts || {};
     var P = pal(opts.skin || 'young');
     var fn = STORY_SCENES[unitId];
     var g = '';
-    // soft frame
-    g += r(1, 1, 98, 98, P.bg, 8, 'stroke="' + P.ink + '" stroke-width="2"');
+    // soft rounded frame
+    g += r(1, 1, 98, 98, P.bg, 12, 'stroke="' + P.ink + '" stroke-width="1.6"');
+    var body = '';
     if (fn) {
-      g += '<g transform="translate(0,0)">' + fn(P, pageIndex || 0) + '</g>';
+      body = fn(P, pageIndex || 0);
     } else {
-      // generic friendly scene + motif
-      g += sky(P, false);
-      g += '<g transform="translate(50,48) scale(0.9) translate(-50,-50)">' + (MOTIF.scroll(P)) + '</g>';
-      g += kidFigure(P, 78, 78, 0.85);
+      body = sky(P, false);
+      body += '<g transform="translate(50,48) scale(0.9) translate(-50,-50)">' + (MOTIF.scroll(P)) + '</g>';
+      body += kidFigure(P, 78, 78, 0.85);
+    }
+    // Soft ambient motion over the whole scene (slow breathe + tiny sway)
+    if (opts.animate !== false) {
+      g += bob(sway(body, 5.5, 1.6), 4.2, 1.1);
+      // floating sparkles
+      g += twinkle(18, 16, 1.2, '#fff6c8', 0);
+      g += twinkle(82, 22, 1.0, '#ffe0a0', 0.7);
+      g += twinkle(30, 28, 0.9, '#fff', 1.4);
+    } else {
+      g += body;
     }
     // page pips
     var total = opts.total || 1;
     var pi = pageIndex || 0;
     for (var d = 0; d < Math.min(total, 8); d++) {
-      g += c(50 - (Math.min(total, 8) - 1) * 4 + d * 8, 94, d === pi ? 2.4 : 1.6, d === pi ? P.a : '#cfc3b0');
+      g += c(50 - (Math.min(total, 8) - 1) * 4 + d * 8, 94, d === pi ? 2.6 : 1.5, d === pi ? P.a : '#cfc3b0');
     }
-    return svg(g, { vb: '0 0 100 100', label: 'story picture', cls: 'art art-story-scene' });
+    return svg(g, { vb: '0 0 100 100', label: 'story picture', cls: 'art art-story-scene soft-cartoon' });
   }
 
   /* ---------- logo: a little ship under a cross-sail ---------- */

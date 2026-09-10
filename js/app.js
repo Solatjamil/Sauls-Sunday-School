@@ -42,6 +42,38 @@
   function prof() { return St.profile(); }
   function skin() { var p = prof(); return p ? L.TIERS[p.tier].skin : 'mid'; }
   function tier() { var p = prof(); return p ? p.tier : 'M'; }
+  function narrLang() {
+    var s = St.root && St.root.settings; var c = (s && s.narrLang) || 'en';
+    var ok = { en: 1, ur: 1, hi: 1, ar: 1 };
+    return ok[c] ? c : 'en';
+  }
+  function voiceLangs() {
+    return (root.SS_StoryI18n && root.SS_StoryI18n.VOICE_LANGS) || [
+      { code: 'en', label: 'English', short: 'EN', bcp47: 'en-GB', dir: 'ltr' },
+      { code: 'ur', label: 'اردو', short: 'UR', bcp47: 'ur-PK', dir: 'rtl' },
+      { code: 'hi', label: 'हिन्दी', short: 'HI', bcp47: 'hi-IN', dir: 'ltr' },
+      { code: 'ar', label: 'عربي', short: 'AR', bcp47: 'ar-SA', dir: 'rtl' }
+    ];
+  }
+  function unitStory(u) {
+    var lang = narrLang();
+    if (root.SS_StoryI18n && root.SS_StoryI18n.storyFor) return root.SS_StoryI18n.storyFor(u, lang);
+    return (u && u.story) || [];
+  }
+  function unitTitle(u) {
+    var lang = narrLang();
+    if (root.SS_StoryI18n && root.SS_StoryI18n.titleFor) return root.SS_StoryI18n.titleFor(u, lang);
+    return (u && u.title) || '';
+  }
+  function voiceToggleHTML() {
+    var cur = narrLang();
+    return '<div class="voice-toggle" role="group" aria-label="' + esc(t('player.voiceLang')) + '">' +
+      '<span class="vt-label">' + esc(t('player.voiceLang')) + '</span>' +
+      '<div class="vt-chips">' + voiceLangs().map(function (v) {
+        return '<button type="button" class="vt-chip' + (cur === v.code ? ' on' : '') + '" data-act="set-narr-lang" data-arg="' + v.code + '" title="' + esc(v.label) + '">' +
+          '<b>' + esc(v.short) + '</b><i>' + esc(v.label) + '</i></button>';
+      }).join('') + '</div></div>';
+  }
   function visibleUnits(tierId) { return units().filter(function (u) { return L.canChildSee(u, tierId || tier()); }); }
 
   function trackName(id) { return (M.TRACKS[id] && M.TRACKS[id].name) || id; }
@@ -425,10 +457,11 @@
   // 7-9 layout still lands on the right words for a 4-year-old.
   function paraPages(u) {
     var per = tier() === 'L' ? 1 : 2;
+    var story = unitStory(u);
     var pages = [];
-    for (var i = 0; i < u.story.length; i += per) {
+    for (var i = 0; i < story.length; i += per) {
       var page = [];
-      for (var j = i; j < Math.min(i + per, u.story.length); j++) page.push({ i: j, t: u.story[j] });
+      for (var j = i; j < Math.min(i + per, story.length); j++) page.push({ i: j, t: story[j] });
       pages.push(page);
     }
     return pages;
@@ -444,12 +477,12 @@
     var html = '';
 
     html += '<div class="unit-top"><button class="btn ghost round" data-act="go" data-arg="' + (u.tier === tier() ? 'path' : 'library') + '">←</button>' +
-      '<div class="unit-title"><b>' + esc(u.title) + '</b><span>' + esc(modeLabel(u)) + ' · ' + esc(trackName(u.track)) + ' · ' + esc(eraName(u.era)) + '</span></div>' +
+      '<div class="unit-title"><b>' + esc(unitTitle(u)) + '</b><span>' + esc(modeLabel(u)) + ' · ' + esc(trackName(u.track)) + ' · ' + esc(eraName(u.era)) + '</span></div>' +
       '<button class="btn ghost round" data-act="go" data-arg="print" data-arg2="' + u.id + '">' + ico('print') + '</button></div>';
 
     if (st.phase === 'cover') {
       html += '<div class="cover">' + Art.motif(u.badge && u.badge.art || 'scroll', { skin: skin(), scale: 1.15 }) +
-        '<h1>' + esc(u.title) + '</h1><p class="sum">' + esc(u.summary) + '</p>' +
+        '<h1>' + esc(unitTitle(u)) + '</h1><p class="sum">' + esc(u.summary) + '</p>' +
         (u.scripture && u.scripture[0] ? '<p class="cover-quote">“' + esc(u.scripture[0].text) + '” <span>' + esc(u.scripture[0].ref) + '</span></p>' : '') +
         '<div class="cover-btns"><button class="btn big primary" data-act="unit-start">' + esc(done ? t('player.retake') : t('path.start')) + '</button>' +
         '<button class="btn ghost" data-act="unit-silent">' + esc(t('player.silent')) + '</button></div>' +
@@ -461,24 +494,30 @@
     if (st.phase === 'story') {
       var page = pages[st.page] || [];
       var youngStory = tier() === 'L';
+      var nl = narrLang();
+      var dir = (nl === 'ur' || nl === 'ar') ? 'rtl' : 'ltr';
       html += '<div class="read-bar"><button class="btn primary pill" data-act="narrate">' + ico('play') + '<span>' + esc(t('player.listen')) + '</span></button>' +
         '<button class="btn ghost pill" data-act="narrate-stop">' + ico('stop') + '</button>' +
         (youngStory ? '' : '<label class="tog"><input type="checkbox" data-set="readAlong"' + (St.root.settings.readAlong ? ' checked' : '') + '/><span>' + esc(t('player.readAlong')) + '</span></label>') +
         '<button class="btn ghost pill" data-act="rate-toggle">' + esc(t('player.speed')) + ' ×' + Sp.rate + '</button></div>';
+      html += voiceToggleHTML();
+      html += '<p class="voice-hint">' + esc(t('player.voiceLangHint')) + '</p>';
       if (youngStory) {
         var sceneKey = page[0] ? ('s' + page[0].i) : ('s' + st.page);
-        html += '<div class="story-theatre" data-skin="young">' +
-          '<div class="story-slide" key-scene="' + sceneKey + '">' +
-          Art.storyScene(u.id, st.page, { skin: 'young', total: pages.length }) +
+        html += '<div class="story-theatre soft-motion" data-skin="young">' +
+          '<div class="story-slide" data-scene="' + sceneKey + '">' +
+          Art.storyScene(u.id, st.page, { skin: 'young', total: pages.length, animate: true }) +
           '</div>' +
           '<div class="listen-row" aria-hidden="true">' +
-          '<div class="listen-child">' + Art.listeningChild({ skin: 'young' }) + '</div>' +
-          '<div class="listen-bubble"><span class="eq" aria-hidden="true"><i></i><i></i><i></i><i></i></span>' +
+          '<div class="listen-child bob">' + Art.listeningChild({ skin: 'young' }) + '</div>' +
+          '<div class="listen-bubble"><span class="eq soft" aria-hidden="true"><i></i><i></i><i></i><i></i></span>' +
           '<b>' + esc(t('player.listening')) + '</b></div></div></div>';
-        html += '<div class="pages pages-young">' + page.map(function (para) { return paraHTML(para.t, 's' + para.i); }).join('') + '</div>';
+        html += '<div class="pages pages-young" dir="' + dir + '">' + page.map(function (para) { return paraHTML(para.t, 's' + para.i); }).join('') + '</div>';
       } else {
-        html += '<div class="pages">' + page.map(function (para) { return paraHTML(para.t, 's' + para.i); }).join('') + '</div>';
-        if (u.scripture && u.scripture.length) {
+        // Older tiers still get a soft illustrated banner that gently moves
+        html += '<div class="story-banner soft-motion">' + Art.storyScene(u.id, st.page, { skin: skin(), total: pages.length, animate: true }) + '</div>';
+        html += '<div class="pages" dir="' + dir + '">' + page.map(function (para) { return paraHTML(para.t, 's' + para.i); }).join('') + '</div>';
+        if (u.scripture && u.scripture.length && nl === 'en') {
           html += '<div class="scripture"><b>' + esc(t('player.original')) + '</b>' +
             u.scripture.map(function (s) { return '<p>“' + esc(s.text) + '” <span>' + esc(s.ref) + ' (WEB)</span></p>'; }).join('') + '</div>';
         }
@@ -556,21 +595,37 @@
     var u = unitById(st.unitId);
     var paras = document.querySelectorAll('.para');
     if (!paras.length) return;
+    var nl = narrLang();
+    var bcp = (root.SS_StoryI18n && root.SS_Speech && Sp.bcp47) ? Sp.bcp47(nl) : ({ en: 'en-GB', ur: 'ur-PK', hi: 'hi-IN', ar: 'ar-SA' }[nl] || 'en-GB');
+    Sp.lang = nl;
     var idx = 0;
     function speakOne() {
       if (idx >= paras.length) { Sp.stop(); return; }
       var elx = paras[idx];
       var text = Array.prototype.map.call(elx.querySelectorAll('.w'), function (w) { return w.textContent; }).join(' ');
-      var url = Sp.hasAudioFor(u, I.lang, elx.getAttribute('data-para'));
+      // Recorded audio only when narration language matches UI pack language
+      var url = Sp.hasAudioFor(u, nl, elx.getAttribute('data-para'));
       Sp.speakElement(elx, text, {
-        lang: I.lang === 'ur' ? 'ur-PK' : 'en-GB', audio: url,
-        onDone: function () { idx++; setTimeout(speakOne, 220); }
+        lang: bcp, langCode: nl, audio: url,
+        onDone: function () { idx++; setTimeout(speakOne, 280); }
       });
     }
     speakOne();
   }
   actions['narrate'] = function () { narrate(); };
   actions['narrate-stop'] = function () { Sp.stop(); };
+  actions['set-narr-lang'] = function (code) {
+    var ok = { en: 1, ur: 1, hi: 1, ar: 1 };
+    if (!ok[code]) return;
+    St.setSetting('narrLang', code);
+    Sp.lang = code;
+    Sp.voiceURI = null; // allow auto-pick of a mother-tongue voice
+    St.setSetting('voice', null);
+    var st = App.unitState;
+    if (st) { st.autoPlayed = false; }
+    Sp.stop();
+    paint();
+  };
   actions['rate-toggle'] = function () {
     Sp.rate = Sp.rate >= 1.3 ? 0.8 : Math.round((Sp.rate + 0.2) * 10) / 10;
     St.setSetting('rate', Sp.rate); paint();
@@ -991,7 +1046,7 @@
     St.load();
     Sp.rate = St.root.settings.rate || 1;
     Sp.enabled = St.root.settings.narration !== false;
-    Sp.lang = St.root.settings.lang || 'en';
+    Sp.lang = St.root.settings.narrLang || St.root.settings.lang || 'en';
     Sp.init();
     views.home = homeView; views.onboard = function () { return onboardView(); };
     views.path = pathView; views.library = libraryView; views.unit = unitView; views.more = moreView;

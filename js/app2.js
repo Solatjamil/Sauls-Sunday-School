@@ -601,7 +601,11 @@
     var html = '<div class="page-head"><h1>' + esc(t('set.title')) + '</h1></div>' +
       '<section><h3>' + esc(t('parent.lang')) + '</h3><div class="row wrap">' + I.LANGS.map(function (l) {
         return '<button class="chip' + (I.lang === l.code ? ' on' : '') + '" data-act="set-lang" data-arg="' + l.code + '">' + esc(l.name) + '</button>';
-      }).join('') + '</div><p class="muted-note">Story text is written for English and Urdu; other languages follow the same data shape. Urdu lessons are being translated unit by unit — untranslated ones show English with the interface in Urdu.</p></section>';
+      }).join('') + '</div></section>';
+    html += '<section><h3>' + esc(t('player.voiceLang')) + '</h3><div class="row wrap">' +
+      (root.SS_StoryI18n ? root.SS_StoryI18n.VOICE_LANGS : [{code:'en',label:'English'},{code:'ur',label:'اردو'},{code:'hi',label:'हिन्दी'},{code:'ar',label:'عربي'}]).map(function (v) {
+        return '<button class="chip' + ((s.narrLang || 'en') === v.code ? ' on' : '') + '" data-act="set-narr-lang" data-arg="' + v.code + '">' + esc(v.label) + '</button>';
+      }).join('') + '</div><p class="muted-note">' + esc(t('player.voiceLangHint')) + '</p></section>';
     html += '<section><h3>' + esc(t('set.narration')) + '</h3>' +
       '<label class="tog"><input type="checkbox" data-setting="narration"' + (s.narration !== false ? ' checked' : '') + '/><span>' + esc(t('player.listen')) + '</span></label>' +
       '<label class="tog"><input type="checkbox" data-setting="readAlong"' + (s.readAlong !== false ? ' checked' : '') + '/><span>' + esc(t('set.readalong')) + '</span></label>' +
