@@ -694,15 +694,21 @@
     var nl = narrLang();
     var bcp = (Sp.bcp47 ? Sp.bcp47(nl) : ({ en: 'en-GB', ur: 'ur-PK', hi: 'hi-IN', ar: 'ar-SA' }[nl] || 'en-GB'));
     Sp.lang = nl;
+    // Drop a saved English-only voice when narrating another language
+    if (nl !== 'en' && Sp.voiceURI && Sp.voicesFor) {
+      var okV = Sp.voicesFor(nl).some(function (v) { return v.voiceURI === Sp.voiceURI; });
+      if (!okV) Sp.voiceURI = null;
+    }
     var idx = 0;
     function speakOne() {
       if (idx >= paras.length) { Sp.stop(); return; }
       var elx = paras[idx];
       var text = Array.prototype.map.call(elx.querySelectorAll('.w'), function (w) { return w.textContent; }).join(' ');
       if (!text || !String(text).trim()) { idx++; setTimeout(speakOne, 40); return; }
+      // Matching-language recording only; else device TTS in that language
       var url = Sp.hasAudioFor(u, nl, elx.getAttribute('data-para'));
       Sp.speakElement(elx, text, {
-        lang: bcp, langCode: nl, audio: url,
+        lang: bcp, langCode: nl, audio: url || null, noAudio: !url,
         onDone: function () { idx++; setTimeout(speakOne, 280); }
       });
     }
@@ -722,7 +728,8 @@
     Sp.voiceURI = null; // allow auto-pick of a mother-tongue voice
     St.setSetting('voice', null);
     var st = App.unitState;
-    if (st) { st.autoPlayed = false; }
+    // Reset so story view's afterPaint re-narrates in the new language
+    if (st) st.autoPlayed = false;
     Sp.stop();
     paint();
   };

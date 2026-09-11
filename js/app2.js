@@ -647,18 +647,28 @@
       return '<button class="chip' + (I.lang === l.code ? ' on' : '') + '" data-act="set-lang" data-arg="' + l.code + '">' + esc(l.name) + '</button>';
     }).join('') + '</div></section>';
 
+    var narrCode = s.narrLang || 'en';
     html += '<section><h3>' + esc(t('player.voiceLang')) + '</h3><div class="row wrap">' +
       (root.SS_StoryI18n ? root.SS_StoryI18n.VOICE_LANGS : [{ code: 'en', label: 'English' }, { code: 'ur', label: 'اردو' }, { code: 'hi', label: 'हिन्दी' }, { code: 'ar', label: 'عربي' }]).map(function (v) {
-        return '<button class="chip' + ((s.narrLang || 'en') === v.code ? ' on' : '') + '" data-act="set-narr-lang" data-arg="' + v.code + '">' + esc(v.label) + '</button>';
+        return '<button class="chip' + (narrCode === v.code ? ' on' : '') + '" data-act="set-narr-lang" data-arg="' + v.code + '">' + esc(v.label) + '</button>';
       }).join('') + '</div><p class="muted-note">' + esc(t('player.voiceLangHint')) + '</p></section>';
+
+    // Prefer voices that match the active story language (so Settings can't lock English onto Urdu)
+    var langVoices = (Sp.voicesFor && Sp.voicesFor(narrCode)) || [];
+    if (!langVoices.length) langVoices = voices;
+    var voiceHint = '';
+    if (narrCode !== 'en' && Sp.voicesFor && !(Sp.voicesFor(narrCode) || []).length) {
+      voiceHint = '<p class="muted-note">' + esc(t('player.voiceMissing')) + '</p>';
+    }
 
     html += '<section><h3>' + esc(t('set.narration')) + '</h3>' +
       '<label class="tog"><input type="checkbox" data-setting="narration"' + (s.narration !== false ? ' checked' : '') + '/><span>' + esc(t('player.listen')) + '</span></label>' +
       '<label class="tog"><input type="checkbox" data-setting="readAlong"' + (s.readAlong !== false ? ' checked' : '') + '/><span>' + esc(t('set.readalong')) + '</span></label>' +
       '<div class="row"><label class="sld">' + esc(t('set.rate')) + '<input type="range" min="0.7" max="1.4" step="0.1" value="' + (s.rate || 1) + '" data-setting="rate"/></label></div>' +
-      (voices.length ? '<div class="row"><select data-setting="voice"><option value="">' + esc(t('set.defaultVoice')) + '</option>' + voices.map(function (v) {
+      (langVoices.length ? '<div class="row"><select data-setting="voice"><option value="">' + esc(t('set.defaultVoice')) + '</option>' + langVoices.map(function (v) {
         return '<option value="' + esc(v.voiceURI) + '"' + (s.voice === v.voiceURI ? ' selected' : '') + '>' + esc(v.name + ' · ' + v.lang) + '</option>';
       }).join('') + '</select></div>' : '<p class="muted-note">This browser reported no voices. The app still works: it highlights words on a timer instead.</p>') +
+      voiceHint +
       '</section>';
 
     var np = Sy.notifications.permission();

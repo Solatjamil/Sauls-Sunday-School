@@ -40,20 +40,27 @@
          3. null — the caller falls back to the device voice          */
     hasAudioFor: function (unit, lang, key) {
       if (!unit) return null;
+      // Never fall back to another language's recording — wrong audio over
+      // mother-tongue text makes the narrator sound English-only.
       var l = (lang === 'ur' || lang === 'hi' || lang === 'ar') ? lang : 'en';
       var pack = root.SS_AUDIO && root.SS_AUDIO[unit.id];
-      if (pack) {
-        var fromPack = pack[l] || pack.en;
-        if (fromPack) {
-          if (key && fromPack[key]) return fromPack[key];
-          if (!key) { var first = Object.keys(fromPack)[0]; if (first) return fromPack[first]; }
-        }
+      if (pack && pack[l]) {
+        var fromPack = pack[l];
+        if (key && fromPack[key]) return fromPack[key];
+        if (!key) { var first = Object.keys(fromPack)[0]; if (first) return fromPack[first]; }
       }
       var hand = unit.audio;
       if (hand) {
-        var m = typeof hand === 'string' ? null : (hand[l] || hand.en);
+        if (typeof hand === 'string') {
+          // bare string = English-only recording; only use for English
+          return l === 'en' && !key ? hand : null;
+        }
+        var m = hand[l];
         if (m && key && m[key]) return m[key];
-        if (typeof hand === 'string' && !key) return hand;
+        if (m && !key) {
+          var fk = Object.keys(m)[0];
+          if (fk) return m[fk];
+        }
       }
       return null;
     },
@@ -162,21 +169,11 @@
       // Re-enable after "Read quietly" and unlock paused engines
       Speech.ensureOn();
 
-      var u = new SpeechSynthesisUtterance(text);
-      var langCode = opts.langCode || Speech.lang || 'en';
-      u.lang = opts.lang || Speech.bcp47(langCode);
+      var langCode = String(opts.langCode || Speech.lang || 'en').toLowerCase().split('-')[0];
+      var bcp = opts.lang || Speech.bcp47(langCode);
       var pro = Speech.kidProsody(langCode);
-      u.rate = (opts.rate != null ? opts.rate : pro.rate);
-      u.pitch = (opts.pitch != null ? opts.pitch : pro.pitch);
-      u.volume = 1;
-      var v = Speech.pickVoice(langCode);
-      if (v) {
-        try { u.voice = v; } catch (e) { }
-        // Keep utterance lang aligned with the chosen voice when possible
-        if (v.lang) {
-          try { u.lang = v.lang; } catch (e2) { }
-        }
-      }
+      var rate = (opts.rate != null ? opts.rate : pro.rate);
+      var pitch = (opts.pitch != null ? opts.pitch : pro.pitch);
 
       var gotBoundary = false;
       var finished = false;
@@ -186,70 +183,143 @@
         setIdx(-1);
         if (state.onDone) state.onDone();
       };
-      u.onboundary = function (ev) {
-        if (ev && ev.name && ev.name !== 'word') return;
-        gotBoundary = true;
-        var ch = ev && (ev.charIndex != null ? ev.charIndex : 0);
-        var idx = 0;
-        for (var k = 0; k < words.length; k++) { if (words[k].start <= ch) idx = k; else break; }
-        setIdx(idx);
-      };
-      u.onend = function () { finish(); };
-      u.onerror = function () {
-        // If this voice failed, try once with any English fallback so the child still hears something
-        if (!opts._retried && langCode !== 'en') {
-          opts._retried = true;
-          try {
-            var o2 = {};
-            for (var ok in opts) o2[ok] = opts[ok];
-            o2.langCode = 'en'; o2.lang = 'en-GB'; o2.audio = null; o2._retried = true;
-            Speech.speakElement(el, text, o2);
-            return;
-          } catch (err) { }
+
+      function attachHandlers(u) {
+        u.onboundary = function (ev) {
+          if (ev && ev.name && ev.name !== 'word') return;
+          gotBoundary = true;
+          var ch = ev && (ev.charIndex != null ? ev.charIndex : 0);
+          var idx = 0;
+          for (var k = 0; k < words.length; k++) { if (words[k].start <= ch) idx = k; else break; }
+          setIdx(idx);
+        };
+        u.onend = function () { finish(); };
+        u.onerror = function () {
+          // Retry strategies keep the SAME mother-tongue text — never switch to English
+          // (that made Urdu/Hindi/Arabic "only speak English").
+          if (!opts._retryStep) opts._retryStep = 0;
+          if (opts._retryStep < 2 && langCode !== 'en') {
+            opts._retryStep++;
+            try {
+              var o2 = {};
+              for (var ok in opts) o2[ok] = opts[ok];
+              o2.audio = null;
+              o2.noAudio = true;
+              o2._retryStep = opts._retryStep;
+              // 1) force no explicit voice (let engine use lang only)
+              // 2) try sibling tongue voice (ur↔hi) still reading original script
+              if (opts._retryStep === 1) o2.forceNoVoice = true;
+              if (opts._retryStep === 2) o2.allowSibling = true;
+              Speech.speakElement(el, text, o2);
+              return;
+            } catch (err) { }
+          }
+          finish();
+        };
+      }
+
+      function buildUtterance(mode) {
+        var u = new SpeechSynthesisUtterance(text);
+        u.lang = bcp;
+        u.rate = rate;
+        u.pitch = pitch;
+        u.volume = 1;
+        if (mode !== 'novoice') {
+          var v = Speech.pickVoice(langCode, { allowSibling: !!opts.allowSibling || mode === 'sibling' });
+          if (v) {
+            try { u.voice = v; } catch (e) { }
+            // Only align lang with the voice when it is still the same family
+            // (e.g. ur-PK voice). Never adopt en-* from a wrong fallback.
+            if (v.lang && Speech.voiceMatchesLang(v, langCode, { allowSibling: !!opts.allowSibling || mode === 'sibling' })) {
+              try { u.lang = v.lang; } catch (e2) { }
+            }
+          }
         }
-        finish();
-      };
+        attachHandlers(u);
+        return u;
+      }
+
+      var mode = opts.forceNoVoice ? 'novoice' : (opts.allowSibling ? 'sibling' : 'prefer');
+      var u = buildUtterance(mode);
+
       try { synth.cancel(); } catch (e) { }
       try { if (synth.paused) synth.resume(); } catch (e) { }
-      try { synth.speak(u); } catch (e) { finish(); return { mode: 'error' }; }
-      // Chrome bug: utterances stay queued while paused
-      try { if (synth.paused) synth.resume(); } catch (e) { }
-      setTimeout(function () { try { if (synth && synth.paused) synth.resume(); } catch (e) { } }, 60);
+      // Chrome drops utterances spoken in the same tick as cancel()
+      var launch = function () {
+        if (!queue || queue !== state || finished) return;
+        try { synth.speak(u); } catch (e) { finish(); return; }
+        try { if (synth.paused) synth.resume(); } catch (e2) { }
+        setTimeout(function () { try { if (synth && synth.paused) synth.resume(); } catch (e3) { } }, 60);
+      };
+      setTimeout(launch, 30);
 
       // engines that never fire boundary events: fall back to a timer
       setTimeout(function () {
-        if (gotBoundary || !queue || queue !== state) return;
+        if (gotBoundary || !queue || queue !== state || finished) return;
         var j = 0;
         var step2 = function () {
-          if (!queue || queue !== state) return;
+          if (!queue || queue !== state || finished) return;
           if (j >= words.length) return;
           setIdx(j++);
-          state.timer = setTimeout(step2, (60000 / Speech.WPM) / Speech.rate);
+          state.timer = setTimeout(step2, (60000 / Speech.WPM) / Math.max(0.5, Speech.rate || 1));
         };
         step2();
       }, 900);
       return { mode: 'speech' };
     },
+    /* True when a voice belongs to the requested narration family. */
+    voiceMatchesLang: function (voice, langCode, opts) {
+      opts = opts || {};
+      if (!voice) return false;
+      var code = String(langCode || 'en').toLowerCase().split('-')[0];
+      var hay = ((voice.lang || '') + ' ' + (voice.name || '')).toLowerCase();
+      if (code === 'en') return /^en\b/.test((voice.lang || '').toLowerCase()) || /english/.test(hay);
+      if (code === 'ur') {
+        if (/^ur\b/.test((voice.lang || '').toLowerCase()) || /urdu/.test(hay)) return true;
+        if (opts.allowSibling && (/^hi\b/.test((voice.lang || '').toLowerCase()) || /hindi/.test(hay))) return true;
+        return false;
+      }
+      if (code === 'hi') {
+        if (/^hi\b/.test((voice.lang || '').toLowerCase()) || /hindi/.test(hay)) return true;
+        if (opts.allowSibling && (/^ur\b/.test((voice.lang || '').toLowerCase()) || /urdu/.test(hay))) return true;
+        return false;
+      }
+      if (code === 'ar') {
+        return /^ar\b/.test((voice.lang || '').toLowerCase()) || /arabic|naayf|maged|laila|tarik/.test(hay);
+      }
+      return (voice.lang || '').toLowerCase().indexOf(code) === 0;
+    },
     // Prefer a gentle, local parent-like voice for the active narration language.
-    pickVoice: function (langHint) {
+    // NEVER fall back to English for ur/hi/ar — that made every language speak English.
+    pickVoice: function (langHint, opts) {
+      opts = opts || {};
       if (!Speech.voices || !Speech.voices.length) {
         try { if (synth) Speech.voices = synth.getVoices() || []; } catch (e) { }
       }
       if (!Speech.voices || !Speech.voices.length) return null;
       if (Speech.voiceURI) {
         var forced = Speech.voices.filter(function (v) { return v.voiceURI === Speech.voiceURI; })[0];
-        if (forced) return forced;
+        if (forced) {
+          // Ignore a forced English voice when narrating another language
+          var want = String(langHint || Speech.lang || 'en').toLowerCase().split('-')[0];
+          if (want === 'en' || Speech.voiceMatchesLang(forced, want, { allowSibling: true })) return forced;
+        }
       }
-      var code = (langHint || Speech.lang || 'en').toLowerCase();
-      // Match by BCP-47 lang AND by common voice product names (Android/iOS/desktop)
+      var code = String(langHint || Speech.lang || 'en').toLowerCase().split('-')[0];
+      // Match by BCP-47 + product names. English is ONLY for English.
       var prefs = {
-        en: [/^en-GB/i, /^en-IN/i, /^en-AU/i, /^en-US/i, /^en/i, /english/i],
-        ur: [/^ur/i, /urdu/i, /^hi/i, /hindi/i, /^en-IN/i, /^en/i],
-        hi: [/^hi/i, /hindi/i, /veena|kalpana|lekha/i, /^en-IN/i, /^ur/i, /^en/i],
-        ar: [/^ar/i, /arabic/i, /naayf|maged|laila|tarik/i, /^en/i]
+        en: [/^en-GB/i, /^en-IN/i, /^en-AU/i, /^en-US/i, /^en\b/i, /english/i],
+        ur: [/^ur\b/i, /urdu/i],
+        hi: [/^hi\b/i, /hindi/i, /veena|kalpana|lekha/i],
+        ar: [/^ar\b/i, /arabic/i, /naayf|maged|laila|tarik|hoda|salma/i]
       };
+      // Sibling only when explicitly allowed (retry path) — still not English
+      if (opts.allowSibling) {
+        if (code === 'ur') prefs.ur = prefs.ur.concat([/^hi\b/i, /hindi/i]);
+        if (code === 'hi') prefs.hi = prefs.hi.concat([/^ur\b/i, /urdu/i]);
+      }
       var tests = prefs[code] || prefs.en;
-      var i, list, soft, v, hay;
+      var i, list, soft, hay;
       for (i = 0; i < tests.length; i++) {
         list = Speech.voices.filter(function (vv) {
           hay = ((vv.lang || '') + ' ' + (vv.name || ''));
@@ -257,11 +327,16 @@
         });
         if (!list.length) continue;
         soft = list.filter(function (vv) {
-          return /female|woman|girl|zira|samantha|veena|kalpana|lekha|nicky|anya|helen|google UK.*F|female/i.test(vv.name || '');
+          return /female|woman|girl|zira|samantha|veena|kalpana|lekha|nicky|anya|helen|google UK.*F|female|neural/i.test(vv.name || '');
         });
         return (soft[0] || list[0]);
       }
-      return Speech.voices[0] || null;
+      // English may use any remaining English-ish voice; other langs return null
+      // so the utterance keeps u.lang and the engine can still synthesize.
+      if (code === 'en') return Speech.voices.filter(function (vv) {
+        return /^en/i.test(vv.lang || '') || /english/i.test(vv.name || '');
+      })[0] || Speech.voices[0] || null;
+      return null;
     },
     bcp47: function (code) {
       return ({ en: 'en-GB', ur: 'ur-PK', hi: 'hi-IN', ar: 'ar-SA' })[code] || 'en-GB';
@@ -274,18 +349,38 @@
       }
       return { rate: base, pitch: 1.02 };
     },
+    /* List device voices that can narrate this language (for Settings hint). */
+    voicesFor: function (langCode) {
+      if (!Speech.voices || !Speech.voices.length) {
+        try { if (synth) Speech.voices = synth.getVoices() || []; } catch (e) { }
+      }
+      var code = String(langCode || 'en').toLowerCase().split('-')[0];
+      return (Speech.voices || []).filter(function (v) {
+        return Speech.voiceMatchesLang(v, code, { allowSibling: code === 'ur' || code === 'hi' });
+      });
+    },
     speakShort: function (text, lang) {
       if (!Speech.enabled || !synth) return;
       try {
+        Speech.ensureOn();
         var code = lang || Speech.lang || 'en';
-        // allow full bcp47 or short code
         var short = String(code).split('-')[0];
         var u = new SpeechSynthesisUtterance(text);
         u.lang = code.indexOf('-') > 0 ? code : Speech.bcp47(short);
         var pro = Speech.kidProsody(short);
         u.rate = pro.rate; u.pitch = pro.pitch;
-        var v = Speech.pickVoice(short); if (v) { try { u.voice = v; } catch (e) { } }
-        synth.speak(u);
+        var v = Speech.pickVoice(short);
+        if (v) {
+          try { u.voice = v; } catch (e) { }
+          if (v.lang && Speech.voiceMatchesLang(v, short)) {
+            try { u.lang = v.lang; } catch (e2) { }
+          }
+        }
+        try { synth.cancel(); } catch (e3) { }
+        setTimeout(function () {
+          try { synth.speak(u); } catch (e4) { }
+          try { if (synth.paused) synth.resume(); } catch (e5) { }
+        }, 30);
       } catch (e) { }
     }
   };
