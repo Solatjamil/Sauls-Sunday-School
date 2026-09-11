@@ -149,7 +149,6 @@
     document.body.setAttribute('data-skin', skin());
     document.body.setAttribute('data-tier', tier());   // css/app.css sizes the reading text off this
     document.body.setAttribute('data-route', App.route.name);
-    applyLayoutMode();
     var ib = document.getElementById('install-banner-root');
     if (!ib) { ib = document.createElement('div'); ib.id = 'install-banner-root'; document.body.appendChild(ib); }
     var bare = App.route.name === 'onboard' && !prof();
@@ -206,31 +205,11 @@
     } catch (e) { }
     return false;
   }
-  // Webview/desktop browser → previous wider web layout.
-  // Phone browser + installed PWA/Android app → current mobile app layout.
-  function layoutMode() {
-    if (isStandalone()) return 'app';
-    try {
-      if (root.Capacitor && root.Capacitor.isNativePlatform && root.Capacitor.isNativePlatform()) return 'app';
-    } catch (e) { }
-    try {
-      if (root.matchMedia && root.matchMedia('(max-width: 899px)').matches) return 'app';
-    } catch (e2) { return 'app'; }
-    return 'web';
-  }
-  function applyLayoutMode() {
-    var mode = layoutMode();
-    document.body.setAttribute('data-layout', mode);
-    document.body.classList.toggle('layout-web', mode === 'web');
-    document.body.classList.toggle('layout-app', mode === 'app');
-    return mode;
-  }
   function isAndroid() { return /Android/i.test((root.navigator && navigator.userAgent) || ''); }
   function isIOS() { return /iPad|iPhone|iPod/i.test((root.navigator && navigator.userAgent) || ''); }
 
   function installBannerHTML() {
     if (isStandalone() || installDismissed) return '';
-    if (layoutMode() === 'web') return '';
     var showPwa = !!deferredInstall;
     return '<div class="install-banner" role="dialog" aria-label="' + esc(t('install.title')) + '">' +
       '<button type="button" class="ib-x" data-act="install-dismiss" aria-label="' + esc(t('install.later')) + '">×</button>' +
@@ -437,12 +416,9 @@
   function modeLabel(u) { return u.mode === 'story' ? t('lib.story') : u.mode === 'lesson' ? t('lib.lesson') : t('lib.game'); }
   function brandCard() {
     var b = M.BRAND;
-    // Same markup for both layouts — CSS (.layout-web / .layout-app) chooses row vs center
-    return '<div class="brand-card">' +
-      '<div class="bc-top">' +
+    return '<div class="brand-card brand-card-center">' +
       '<div class="bc-logo">' + Art.logo(skin()) + '</div>' +
       '<div class="bc-copy"><b>' + esc(b.parent) + '</b><span>' + esc(b.taglineShort) + '</span></div>' +
-      '</div>' +
       '<div class="bc-links">' + b.links.map(function (l) {
         return '<a class="bc-link" href="' + esc(l.url) + '" target="_blank" rel="noopener noreferrer">' + esc(l.label) + ' ↗</a>';
       }).join('') + '</div></div>';
