@@ -420,11 +420,11 @@
 
     var first = log.length ? log[log.length - 1].day : '—';
     html += '<section><h3>' + esc(t('parent.log')) + ' (' + log.length + ')</h3>' +
-      (log.length ? '<table class="log"><tr><th>Date</th><th>Unit</th><th>Topic</th><th>First-try</th><th>Needed help</th></tr>' +
+      (log.length ? '<div class="table-scroll"><table class="log"><thead><tr><th>Date</th><th>Unit</th><th>Topic</th><th>First-try</th><th>Help</th></tr></thead><tbody>' +
         log.slice(-14).reverse().map(function (r) {
           var u = App.unitById(r.unitId) || {};
           return '<tr><td>' + esc(r.day) + '</td><td>' + esc(u.title || r.unitId) + '</td><td>' + esc(trackName(r.track)) + '</td><td>' + r.correct + '/' + r.total + '</td><td>' + (r.neededHelp || 0) + '</td></tr>';
-        }).join('') + '</table>' : '<p class="muted-note">' + esc(t('parent.firstTime')) + '</p>') + '</section>';
+        }).join('') + '</tbody></table></div>' : '<p class="muted-note">' + esc(t('parent.firstTime')) + '</p>') + '</section>';
 
     var hardUnits = units().filter(function (u) { return u.tier === p.tier && u.mature; });
     html += '<section class="prof-edit-mini"><h3>' + esc(t('set.profile')) + '</h3>' +

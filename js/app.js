@@ -25,7 +25,7 @@
   function units() {
     if (U) return U;
     var all = [];
-    ['SS_UNITS_1', 'SS_UNITS_2', 'SS_UNITS_3', 'SS_UNITS_4', 'SS_UNITS_5', 'SS_UNITS_6'].forEach(function (k) {
+    ['SS_UNITS_1', 'SS_UNITS_2', 'SS_UNITS_3', 'SS_UNITS_4', 'SS_UNITS_5', 'SS_UNITS_6', 'SS_UNITS_7'].forEach(function (k) {
       if (root[k]) all = all.concat(root[k]);
     });
     // catalogue number + derived depth
@@ -373,10 +373,13 @@
     var prog = L.progressOf(units(), p.tier, p.completed);
     var comp = L.companionInfo(p.companion.type, p.xp);
     var verse = M.DAILY_VERSES[M.dailyVerseIndex(L.isoDay(new Date()))];
+    var tierLabel = t('onboard.tier' + (p.tier || 'M'));
     var html = '<div class="hero">' +
-      '<div class="hero-comp">' + Art.companion(p.companion.type, comp.stage, { skin: skin(), name: p.companion.name }) + '</div>' +
+      '<div class="hero-comp motion-sway">' + Art.companion(p.companion.type, comp.stage, { skin: skin(), name: p.companion.name }) + '</div>' +
       '<div class="hero-txt"><div class="hi">' + esc(t('home.hi', { name: p.name })) + '</div>' +
-      '<div class="hi-sub">' + esc(L.framingLevel(p.xp).line) + ' · ' + esc(L.framingStreak(p.streak).line) + '</div></div></div>';
+      '<div class="hi-sub">' + esc(L.framingLevel(p.xp).line) + ' · ' + esc(L.framingStreak(p.streak).line) + '</div>' +
+      '<span class="tier-pill" title="' + esc(t('set.level')) + '">' + esc(tierLabel) + ' · ' + esc(String(p.age)) + '</span>' +
+      '</div></div>';
 
     html += '<div class="next-steps">';
     ns.steps.forEach(function (s, i) {

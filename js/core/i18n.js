@@ -277,7 +277,7 @@
     'set.offline': 'Offline',
     'set.offlineOn': 'Keep for offline use',
     'set.about': 'About this app',
-    'set.aboutText': 'A free, ad-free ministry app for ages 3–12 from Saul’s Podship. No account is needed to learn. Everything stays on this device until you choose to sync.',
+    'set.aboutText': 'A free Bible learning app for ages 3–12 from Saul’s Podship — stories, quizzes, prayer and parent tools. Layout shifts with each age tier. Everything stays on this device until you choose to sync.',
     'set.brand': 'Saul’s Podship',
     'set.visited': 'Open saulspodship.com',
     'set.reset': 'Start this profile over',
