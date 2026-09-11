@@ -625,7 +625,9 @@
         if (St.root.settings.narration !== false && !st.autoPlayed) {
           st.autoPlayed = true;
           if (Sp.ensureOn) Sp.ensureOn(); else Sp.enabled = true;
-          narrate();
+          // Auto-start is not a user gesture — engine may still speak after unlock
+          // from an earlier Listen tap; if blocked, child taps Listen (gesture path).
+          narrate({ fromGesture: false });
         }
       };
       return html;
@@ -683,7 +685,8 @@
     }).join(' ') + '</p>';
   }
 
-  function narrate() {
+  function narrate(opts) {
+    opts = opts || {};
     var st = App.unitState; if (!st) return;
     var u = unitById(st.unitId);
     var paras = document.querySelectorAll('.para');
@@ -691,6 +694,7 @@
     // Always turn voice back on when Listen is pressed (undo "Read quietly")
     St.setSetting('narration', true);
     if (Sp.ensureOn) Sp.ensureOn(); else { Sp.enabled = true; }
+    if (Sp.unlock) Sp.unlock();
     var nl = narrLang();
     var bcp = (Sp.bcp47 ? Sp.bcp47(nl) : ({ en: 'en-GB', ur: 'ur-PK', hi: 'hi-IN', ar: 'ar-SA' }[nl] || 'en-GB'));
     Sp.lang = nl;
@@ -700,22 +704,31 @@
       if (!okV) Sp.voiceURI = null;
     }
     var idx = 0;
-    function speakOne() {
+    // First paragraph must speak inside the user-gesture turn (Listen tap).
+    // Delaying with setTimeout drops mobile activation → total silence.
+    var first = opts.fromGesture !== false;
+    function speakOne(isFirst) {
       if (idx >= paras.length) { Sp.stop(); return; }
       var elx = paras[idx];
       var text = Array.prototype.map.call(elx.querySelectorAll('.w'), function (w) { return w.textContent; }).join(' ');
-      if (!text || !String(text).trim()) { idx++; setTimeout(speakOne, 40); return; }
-      // Matching-language recording only; else device TTS in that language
+      if (!text || !String(text).trim()) { idx++; speakOne(false); return; }
       var url = Sp.hasAudioFor(u, nl, elx.getAttribute('data-para'));
       Sp.speakElement(elx, text, {
-        lang: bcp, langCode: nl, audio: url || null, noAudio: !url,
-        onDone: function () { idx++; setTimeout(speakOne, 280); }
+        lang: bcp,
+        langCode: nl,
+        audio: url || null,
+        noAudio: !url,
+        immediate: !!isFirst, // keep gesture for para 0
+        onDone: function () {
+          idx++;
+          // later paragraphs are chained (gesture already consumed)
+          setTimeout(function () { speakOne(false); }, 220);
+        }
       });
     }
-    // Tiny delay lets stop()/cancel settle before the next utterance (Chrome)
-    setTimeout(speakOne, 40);
+    speakOne(first);
   }
-  actions['narrate'] = function () { narrate(); };
+  actions['narrate'] = function () { narrate({ fromGesture: true }); };
   actions['narrate-stop'] = function () { Sp.stop(); };
   actions['set-narr-lang'] = function (code) {
     var ok = { en: 1, ur: 1, hi: 1, ar: 1 };
@@ -1177,7 +1190,25 @@
     Sp.rate = St.root.settings.rate || 1;
     Sp.enabled = St.root.settings.narration !== false;
     Sp.lang = St.root.settings.narrLang || St.root.settings.lang || 'en';
+    Sp.voiceURI = St.root.settings.voice || null;
     Sp.init();
+    // First user tap unlocks TTS on locked-down mobile browsers
+    if (!root.__ssSpeechUnlock) {
+      root.__ssSpeechUnlock = 1;
+      var unlockOnce = function () {
+        try { if (Sp.unlock) Sp.unlock(); } catch (e) { }
+        try {
+          document.removeEventListener('pointerdown', unlockOnce, true);
+          document.removeEventListener('touchstart', unlockOnce, true);
+          document.removeEventListener('click', unlockOnce, true);
+        } catch (e2) { }
+      };
+      try {
+        document.addEventListener('pointerdown', unlockOnce, true);
+        document.addEventListener('touchstart', unlockOnce, true);
+        document.addEventListener('click', unlockOnce, true);
+      } catch (e3) { }
+    }
     views.home = homeView; views.onboard = function () { return onboardView(); };
     views.path = pathView; views.library = libraryView; views.unit = unitView; views.more = moreView;
     views.switch = switchView;
