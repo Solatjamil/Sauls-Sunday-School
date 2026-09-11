@@ -4,3 +4,4 @@ android/
 *.log
 .DS_Store
 tools/fail.html
+.vercel

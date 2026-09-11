@@ -277,7 +277,7 @@
     'set.offline': 'Offline',
     'set.offlineOn': 'Keep for offline use',
     'set.about': 'About this app',
-    'set.aboutText': 'A free Bible learning app for ages 3–12 from Saul’s Podship — stories, quizzes, prayer and parent tools. Layout shifts with each age tier. Everything stays on this device until you choose to sync.',
+    'set.aboutText': 'Saul’s Sunday School is an official free Bible app for ages 3–12 from Saul’s Podship (saulspodship.com) — 90 lessons (30 per age tier), stories, quizzes, prayer and parent tools. Layout shifts with each age tier. Everything stays on this device until you choose to sync.',
     'set.brand': 'Saul’s Podship',
     'set.visited': 'Open saulspodship.com',
     'set.reset': 'Start this profile over',

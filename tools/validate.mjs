@@ -7,7 +7,7 @@ const root = path.resolve(import.meta.dirname, '..');
 
 const L = require(path.join(root, 'js/core/logic.js'));
 const M = require(path.join(root, 'js/data/meta.js'));
-const files = ['units-1', 'units-2', 'units-3', 'units-4', 'units-5', 'units-6'];
+const files = ['units-1', 'units-2', 'units-3', 'units-4', 'units-5', 'units-6', 'units-7', 'units-8', 'units-9'];
 let units = [];
 for (const f of files) {
   try { units = units.concat(require(path.join(root, 'js/data', f + '.js'))); }

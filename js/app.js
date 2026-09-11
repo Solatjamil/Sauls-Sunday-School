@@ -25,7 +25,7 @@
   function units() {
     if (U) return U;
     var all = [];
-    ['SS_UNITS_1', 'SS_UNITS_2', 'SS_UNITS_3', 'SS_UNITS_4', 'SS_UNITS_5', 'SS_UNITS_6', 'SS_UNITS_7', 'SS_UNITS_8'].forEach(function (k) {
+    ['SS_UNITS_1', 'SS_UNITS_2', 'SS_UNITS_3', 'SS_UNITS_4', 'SS_UNITS_5', 'SS_UNITS_6', 'SS_UNITS_7', 'SS_UNITS_8', 'SS_UNITS_9'].forEach(function (k) {
       if (root[k]) all = all.concat(root[k]);
     });
     // catalogue number + derived depth

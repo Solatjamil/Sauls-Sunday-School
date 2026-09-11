@@ -266,7 +266,7 @@
       var tag = u.id + '.q' + (i + 1);
       if (tdef.quizTypes.indexOf(q.t) === -1) errs.push(tag + ': format ' + q.t + ' not allowed for tier ' + u.tier);
       if (!q || !q.t) { errs.push(tag + ': missing type'); return; }
-      if (['mc', 'match', 'order', 'blank', 'sort', 'tap'].indexOf(q.t) === -1) errs.push(tag + ': unknown type ' + q.t);
+      if (['mc', 'match', 'order', 'blank', 'sort', 'tap', 'type'].indexOf(q.t) === -1) errs.push(tag + ': unknown type ' + q.t);
       if (q.t === 'mc' || q.t === 'tap') {
         if (!q.a || q.a.length < 2) errs.push(tag + ': needs options');
         if (!(q.c >= 0 && q.c < (q.a || []).length)) errs.push(tag + ': bad correct index');

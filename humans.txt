@@ -1,10 +1,15 @@
 /* TEAM */
 Ministry: Saul's Podship
 App: Saul's Sunday School
-Site: https://saulsundayschool.saulspodship.com/
+Site: https://saulssundayschool.saulspodship.com/
 Parent: https://www.saulspodship.com/
+Publisher: Saul's Podship
+Author: Solat Nadeem / Saul's Podship
+Note: Saul's Sunday School is an official kids ministry product of Saul's Podship (saulspodship.com), not an unaffiliated project.
 
 /* SITE */
 Standards: HTML5, CSS3, progressive web app
 Languages: English, Urdu, Hindi, Arabic
+Curriculum: 90 units (30 Seedlings, 30 Builders, 30 Explorers)
 Doctype: HTML5
+Android: com.saulspodship.sundaychool

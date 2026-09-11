@@ -91,12 +91,13 @@
     name: 'Saul\u2019s Sunday School',
     parent: 'Saul\u2019s Podship',
     parentUrl: 'https://www.saulspodship.com/',
-    appUrl: 'https://saulsundayschool.saulspodship.com/',
+    appUrl: 'https://saulssundayschool.saulspodship.com/',
     playUrl: 'https://play.google.com/store/apps/details?id=com.saulspodship.sundaychool',
     playId: 'com.saulspodship.sundaychool',
     appName: 'Saul\u2019s Sunday School',
-    tagline: 'A free ministry from Saul\u2019s Podship \u2014 worship in Spirit and Truth.',
-    taglineShort: 'Free forever. No ads. Just the story.',
+    tagline: 'A free ministry from Saul\u2019s Podship (saulspodship.com) \u2014 worship in Spirit and Truth.',
+    taglineShort: 'Free forever. No ads. Just the story. A Saul\u2019s Podship project.',
+    ownership: 'Official kids ministry product of Saul\u2019s Podship at saulspodship.com.',
     // Older tiers can hop across to the encyclopedia for the same topic.
     volumeHint: 'Grown-ups can go deeper on this in Saul\u2019s Podship volume {n}.',
     characters: {

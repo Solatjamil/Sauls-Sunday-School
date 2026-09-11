@@ -12,7 +12,7 @@ const OUT = path.join(ROOT, 'dist');
 const SRC_ORDER = [
   'js/core/logic.js', 'js/core/i18n.js', 'js/data/meta.js',
   'js/data/units-1.js', 'js/data/units-2.js', 'js/data/units-3.js', 'js/data/units-4.js',
-  'js/data/units-5.js', 'js/data/units-6.js', 'js/data/units-7.js', 'js/data/units-8.js',
+  'js/data/units-5.js', 'js/data/units-6.js', 'js/data/units-7.js', 'js/data/units-8.js', 'js/data/units-9.js',
   'js/data/audio.js',
   'js/data/story-i18n.js',
   'js/core/store.js', 'js/core/art.js', 'js/core/speech.js', 'js/core/sync.js',
@@ -30,7 +30,7 @@ function copyDir(src, dst) {
 
 rmrf(OUT);
 fs.mkdirSync(OUT, { recursive: true });
-['css', 'js', 'assets', 'sw.js', 'manifest.webmanifest', 'index.html', 'robots.txt', 'sitemap.xml', 'humans.txt', '.well-known'].forEach((p) => {
+['css', 'js', 'assets', 'sw.js', 'manifest.webmanifest', 'index.html', 'robots.txt', 'sitemap.xml', 'humans.txt', 'llms.txt', '.well-known'].forEach((p) => {
   const s = path.join(ROOT, p);
   if (!fs.existsSync(s)) { console.warn('  missing:', p); return; }
   if (fs.statSync(s).isDirectory()) copyDir(s, path.join(OUT, p));
