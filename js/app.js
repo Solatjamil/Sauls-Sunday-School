@@ -149,6 +149,12 @@
     document.body.setAttribute('data-skin', skin());
     document.body.setAttribute('data-tier', tier());   // css/app.css sizes the reading text off this
     document.body.setAttribute('data-route', App.route.name);
+    var ib = document.getElementById('install-banner-root');
+    if (!ib) { ib = document.createElement('div'); ib.id = 'install-banner-root'; document.body.appendChild(ib); }
+    var bare = App.route.name === 'onboard' && !prof();
+    ib.innerHTML = bare ? '' : installBannerHTML();
+    if (document.querySelector('.botnav')) document.body.classList.add('has-botnav');
+    else document.body.classList.remove('has-botnav');
     if (App.afterPaint) { var cb = App.afterPaint; App.afterPaint = null; cb(); }
     if (typeof requestAnimationFrame === 'function') requestAnimationFrame(function () {
       var f2 = document.querySelector('[data-focus]'); if (f2) { try { f2.focus(); } catch (e) { } }
@@ -180,7 +186,90 @@
     App.route = r; paint();
   }
 
+
   /* ============================================================
+     INSTALL — Android Play + PWA home-screen prompt
+     ============================================================ */
+  var deferredInstall = null;
+  var installDismissed = false;
+  try { installDismissed = root.sessionStorage && sessionStorage.getItem('sssd.installDismiss') === '1'; } catch (e) { }
+
+  function playUrl() {
+    return (M && M.BRAND && M.BRAND.playUrl) || 'https://play.google.com/store/apps/details?id=com.saulspodship.sundaychool';
+  }
+  function isStandalone() {
+    try {
+      if (root.matchMedia && root.matchMedia('(display-mode: standalone)').matches) return true;
+      if (root.navigator && root.navigator.standalone) return true;
+      if (root.Capacitor && root.Capacitor.isNativePlatform && root.Capacitor.isNativePlatform()) return true;
+    } catch (e) { }
+    return false;
+  }
+  function isAndroid() { return /Android/i.test((root.navigator && navigator.userAgent) || ''); }
+  function isIOS() { return /iPad|iPhone|iPod/i.test((root.navigator && navigator.userAgent) || ''); }
+
+  function installBannerHTML() {
+    if (isStandalone() || installDismissed) return '';
+    var showPwa = !!deferredInstall;
+    return '<div class="install-banner" role="dialog" aria-label="' + esc(t('install.title')) + '">' +
+      '<button type="button" class="ib-x" data-act="install-dismiss" aria-label="' + esc(t('install.later')) + '">×</button>' +
+      '<div class="ib-icon"><img src="assets/icons/icon-192.png" width="52" height="52" alt="' + esc(t('app.name')) + '"/></div>' +
+      '<div class="ib-txt"><b>' + esc(t('install.title')) + '</b>' +
+      '<span>' + esc(t('install.sub')) + '</span>' +
+      '<em class="ib-badge">' + esc(t('install.badge')) + '</em></div>' +
+      '<div class="ib-actions">' +
+      '<a class="btn primary" data-act="install-play" href="' + esc(playUrl()) + '" target="_blank" rel="noopener noreferrer">' + esc(t('install.play')) + '</a>' +
+      (showPwa ? '<button type="button" class="btn ghost" data-act="install-pwa">' + esc(t('install.pwa')) + '</button>' :
+        (isIOS() ? '<button type="button" class="btn ghost" data-act="install-ios-hint">' + esc(t('install.ios')) + '</button>' :
+          '<button type="button" class="btn ghost" data-act="install-pwa">' + esc(t('install.pwa')) + '</button>')) +
+      '</div></div>';
+  }
+  function installCardHTML() {
+    if (isStandalone()) return '';
+    return '<div class="install-card">' +
+      '<b>' + esc(t('install.homeCta')) + '</b>' +
+      '<span class="muted-note">' + esc(t('install.sub')) + '</span>' +
+      '<div class="row wrap">' +
+      '<a class="btn primary" href="' + esc(playUrl()) + '" target="_blank" rel="noopener noreferrer" data-act="install-play">' + esc(t('install.play')) + '</a>' +
+      '<button type="button" class="btn ghost" data-act="install-pwa">' + esc(t('install.pwa')) + '</button>' +
+      '</div></div>';
+  }
+  function wireInstallPrompt() {
+    if (root.__sssdInstallWired) return;
+    root.__sssdInstallWired = 1;
+    root.addEventListener('beforeinstallprompt', function (e) {
+      try { e.preventDefault(); } catch (err) { }
+      deferredInstall = e;
+      try { if (typeof paint === 'function') paint(); } catch (err2) { }
+    });
+    root.addEventListener('appinstalled', function () {
+      deferredInstall = null;
+      installDismissed = true;
+      try { sessionStorage.setItem('sssd.installDismiss', '1'); } catch (e) { }
+      try { if (typeof paint === 'function') paint(); } catch (err) { }
+    });
+  }
+  actions['install-dismiss'] = function () {
+    installDismissed = true;
+    try { sessionStorage.setItem('sssd.installDismiss', '1'); } catch (e) { }
+    paint();
+  };
+  actions['install-play'] = function () { /* anchor navigates */ };
+  actions['install-pwa'] = function () {
+    if (deferredInstall && deferredInstall.prompt) {
+      deferredInstall.prompt();
+      try {
+        deferredInstall.userChoice.then(function () { deferredInstall = null; paint(); });
+      } catch (e) { deferredInstall = null; paint(); }
+      return;
+    }
+    if (isIOS()) { toast(t('install.ios')); return; }
+    try { root.open(playUrl(), '_blank', 'noopener'); } catch (e) { root.location.href = playUrl(); }
+  };
+  actions['install-ios-hint'] = function () { toast(t('install.ios')); };
+
+
+    /* ============================================================
      ONBOARDING — three questions only: name, age, companion friend
      ============================================================ */
   var ob = null;

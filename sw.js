@@ -1,8 +1,8 @@
 /* Offline shell: caches the whole app, then serves cache-first for
    same-origin GETs. Content data is bundled in JS, so one cache =
    a fully working app with no network. */
-const VER = 'sssd-v6';
-const CORE = ['./', './index.html', './css/app.css', './manifest.webmanifest',
+const VER = 'sssd-v7';
+const CORE = ['./', './index.html', './css/app.css', './manifest.webmanifest', './robots.txt', './sitemap.xml',
   './js/core/logic.js', './js/core/i18n.js', './js/core/store.js', './js/core/art.js',
   './js/core/speech.js', './js/core/sync.js', './js/app.js', './js/app2.js',
   './js/data/meta.js', './js/data/units-1.js', './js/data/units-2.js', './js/data/units-3.js',

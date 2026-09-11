@@ -30,7 +30,7 @@ function copyDir(src, dst) {
 
 rmrf(OUT);
 fs.mkdirSync(OUT, { recursive: true });
-['css', 'js', 'assets', 'sw.js', 'manifest.webmanifest', 'index.html'].forEach((p) => {
+['css', 'js', 'assets', 'sw.js', 'manifest.webmanifest', 'index.html', 'robots.txt', 'sitemap.xml', 'humans.txt', '.well-known'].forEach((p) => {
   const s = path.join(ROOT, p);
   if (!fs.existsSync(s)) { console.warn('  missing:', p); return; }
   if (fs.statSync(s).isDirectory()) copyDir(s, path.join(OUT, p));

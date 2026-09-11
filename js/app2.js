@@ -680,6 +680,12 @@
       '</div></section>';
 
     html += '<section><h3>' + esc(t('safe.title')) + '</h3><p class="muted-note">' + esc(t('safe.body')) + '</p></section>';
+    html += '<section><h3>' + esc(t('install.title')) + '</h3>' +
+      '<p class="muted-note">' + esc(t('install.sub')) + '</p>' +
+      '<div class="row wrap">' +
+      '<a class="btn primary" href="' + esc((M.BRAND && M.BRAND.playUrl) || 'https://play.google.com/store/apps/details?id=com.saulspodship.sundaychool') + '" target="_blank" rel="noopener noreferrer">' + esc(t('install.play')) + '</a>' +
+      '<button class="btn ghost" data-act="install-pwa">' + esc(t('install.pwa')) + '</button></div></section>';
+
     html += '<section><h3>' + esc(t('set.about')) + '</h3><p>' + esc(t('set.aboutText')) + '</p>' +
       '<a class="pod-link" href="' + esc(M.BRAND.parentUrl) + '" target="_blank" rel="noopener noreferrer">' + esc(t('set.visited')) + ' ↗</a></section>';
     html += '<section><button class="btn ghost dangerish" data-act="reset-profile">' + esc(t('set.reset')) + '</button></section>';
