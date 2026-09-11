@@ -1,16 +1,17 @@
 /* =====================================================================
    Narration + read-along word highlighting.
 
-   Paths (in order):
-     1. Matching-language recorded MP3 (assets / unit.audio)
-     2. Device speechSynthesis — only when a REAL voice for that language exists
-     3. Online mother-tongue TTS (Google Translate audio) for ur / hi / ar / en
-        when the device has no voice pack — this is why English worked before
-        and Urdu/Hindi/Arabic stayed silent on most phones
-     4. Timed word highlight (no sound) as last resort
+   Paths:
+     1. Matching-language recorded MP3
+     2. Device speechSynthesis when a REAL voice for that language exists
+     3. Online mother-tongue TTS via /api/tts (blob fetch — reliable on mobile)
+     4. Timed highlight if offline / blocked
 
-   Never play English audio/voice over Urdu/Hindi/Arabic story text.
-   Listen must call speak() / audio.play() inside the user-gesture turn.
+   Mobile rules:
+     - audio.play() needs a user gesture the first time (Listen tap)
+     - Do not auto-start cloud narration without a gesture (chips only change text)
+     - Fetch→blob→play avoids flaky remote <audio src> + poisoned element state
+     - Never speak English audio over ur/hi/ar text
    ===================================================================== */
 (function (root) {
   'use strict';
@@ -19,7 +20,8 @@
   var queue = null;
   var gen = 0;
   var unlockDone = false;
-  var cloudCache = {}; // text|lang -> blob URL
+  var blobCache = {}; // key -> { url, ts }
+  var BLOB_MAX = 80;
 
   var Speech = {
     supported: !!(synth || root.Audio),
@@ -33,6 +35,7 @@
     lastError: null,
     lastMode: null,
     cloudEnabled: true,
+    needsGesture: false, // set true when cloud auto-play was blocked
 
     init: function () {
       if (!synth) return;
@@ -46,7 +49,6 @@
       setTimeout(grab, 2000);
     },
 
-    /* Matching-language recording only. */
     hasAudioFor: function (unit, lang, key) {
       if (!unit) return null;
       var l = (lang === 'ur' || lang === 'hi' || lang === 'ar') ? lang : 'en';
@@ -76,9 +78,23 @@
       gen++;
       if (queue && queue.timer) { clearTimeout(queue.timer); queue.timer = null; }
       if (queue && queue.launchTimer) { clearTimeout(queue.launchTimer); queue.launchTimer = null; }
-      if (Speech.audioEl) {
-        try { Speech.audioEl.onended = null; Speech.audioEl.onerror = null; Speech.audioEl.ontimeupdate = null; } catch (e0) { }
-        try { Speech.audioEl.pause(); Speech.audioEl.removeAttribute('src'); Speech.audioEl.load(); } catch (e) { }
+      if (queue && queue.abort) {
+        try { queue.abort.abort(); } catch (eA) { }
+      }
+      var a = Speech.audioEl;
+      if (a) {
+        try {
+          a.onended = null;
+          a.onerror = null;
+          a.ontimeupdate = null;
+          a.oncanplay = null;
+          a.pause();
+        } catch (e) { }
+        // Do NOT removeAttribute('src') + load() — that poisons some WebViews
+        try {
+          a.src = 'data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAESsAACJWAAACABAAZGF0YQAAAAA=';
+          a.pause();
+        } catch (e2) { }
       }
       if (synth) {
         try { synth.cancel(); } catch (e) { }
@@ -107,11 +123,9 @@
           synth.cancel();
         }
       } catch (e) { }
-      // Separate throwaway element so we don't poison Speech.audioEl.src
       try {
         var a = new Audio();
         a.muted = true;
-        // tiny silent wav data-uri
         a.src = 'data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAESsAACJWAAACABAAZGF0YQAAAAA=';
         var p = a.play();
         if (p && p.then) p.then(function () { try { a.pause(); } catch (e4) { } }).catch(function () { });
@@ -234,9 +248,18 @@
       try { return root.navigator ? root.navigator.onLine !== false : true; } catch (e) { return true; }
     },
 
-    /* Split long paragraphs so each cloud request stays under ~180 chars. */
+    /* Mother-tongue cloud is more reliable than missing/broken device packs. */
+    usesCloud: function (langCode) {
+      if (!Speech.cloudEnabled || !Speech.online()) return false;
+      var code = String(langCode || 'en').toLowerCase().split('-')[0];
+      if (code === 'en') return !Speech.hasNativeVoice('en');
+      // Always prefer cloud for ur/hi/ar on web — device packs are rare and flaky.
+      // If a real native voice exists, still allow device first only when forceDevice.
+      return true;
+    },
+
     chunkText: function (text, maxLen) {
-      maxLen = maxLen || 160;
+      maxLen = maxLen || 140;
       text = String(text || '').replace(/\s+/g, ' ').trim();
       if (!text) return [];
       if (text.length <= maxLen) return [text];
@@ -254,7 +277,6 @@
           if (b.length <= maxLen) {
             buf = b;
           } else {
-            // hard-split long run-on
             var words = b.split(/\s+/);
             buf = '';
             for (var w = 0; w < words.length; w++) {
@@ -280,7 +302,6 @@
           isNative = true;
         }
       } catch (e) { }
-      // Web / PWA: same-origin proxy (mobile-safe). Native APK: hit Google directly.
       try {
         if (!isNative && root.location && root.location.protocol !== 'file:' && root.location.host) {
           return '/api/tts?lang=' + encodeURIComponent(tl) + '&q=' + encodeURIComponent(text);
@@ -290,85 +311,171 @@
         encodeURIComponent(tl) + '&q=' + encodeURIComponent(text);
     },
 
-    /* Prefer device voice only when it truly speaks this language.
-       For ur/hi/ar without a pack → cloud. English stays on-device first. */
-    preferCloud: function (langCode) {
-      if (!Speech.cloudEnabled || !Speech.online()) return false;
-      var code = String(langCode || 'en').toLowerCase().split('-')[0];
-      if (code === 'en') return !Speech.hasNativeVoice('en');
-      // Mother tongue: use cloud unless a real native pack is installed
-      return !Speech.hasNativeVoice(code);
+    cacheKey: function (text, langCode) {
+      return Speech.cloudTl(langCode) + '|' + String(text);
     },
 
-    /* ---- play a list of audio URLs with word highlight ---- */
-    playUrlList: function (urls, state, setIdx, finish, stillMine, rate) {
-      var a = Speech.audioEl || (Speech.audioEl = new Audio());
-      var ci = 0;
-      var words = state.words;
-      var wordCursor = 0;
+    putBlob: function (key, url) {
+      try {
+        var keys = Object.keys(blobCache);
+        if (keys.length >= BLOB_MAX) {
+          var oldest = keys.sort(function (a, b) { return (blobCache[a].ts || 0) - (blobCache[b].ts || 0); })[0];
+          if (oldest) {
+            try { root.URL.revokeObjectURL(blobCache[oldest].url); } catch (e) { }
+            delete blobCache[oldest];
+          }
+        }
+        blobCache[key] = { url: url, ts: Date.now() };
+      } catch (e2) { }
+    },
 
-      function playChunk() {
-        if (!stillMine()) return;
-        if (ci >= urls.length) {
-          finish();
-          return;
-        }
-        var url = urls[ci];
-        a.onended = null;
-        a.onerror = null;
-        a.ontimeupdate = null;
-        a.src = url;
-        try { a.playbackRate = rate || 1; } catch (e) { }
-        var chunkWords = Math.max(1, Math.ceil(words.length / urls.length));
-        var startW = wordCursor;
-        var endW = Math.min(words.length, startW + chunkWords);
-        if (ci === urls.length - 1) endW = words.length;
-
-        a.ontimeupdate = function () {
-          if (!stillMine()) return;
-          var frac = (a.duration && a.duration > 0) ? (a.currentTime / a.duration) : 0;
-          var wi = startW + Math.floor(frac * (endW - startW));
-          setIdx(Math.max(startW, Math.min(endW - 1, wi)));
-        };
-        a.onended = function () {
-          if (!stillMine()) return;
-          wordCursor = endW;
-          setIdx(Math.min(words.length - 1, endW - 1));
-          ci++;
-          playChunk();
-        };
-        a.onerror = function () {
-          if (!stillMine()) return;
-          // skip bad chunk
-          ci++;
-          playChunk();
-        };
-        var started = null;
-        try { started = a.play(); } catch (e) {
-          Speech.lastError = 'audio-play';
-          finish();
-          return;
-        }
-        if (started && typeof started.then === 'function') {
-          started.then(function () { }, function () {
-            if (!stillMine()) return;
-            ci++;
-            playChunk();
-          });
-        }
+    /* Fetch TTS as blob (with retries). Same-origin /api/tts is reliable. */
+    fetchCloudBlob: function (text, langCode, signal) {
+      var key = Speech.cacheKey(text, langCode);
+      if (blobCache[key] && blobCache[key].url) {
+        return Promise.resolve(blobCache[key].url);
       }
-      playChunk();
+      var url = Speech.cloudUrl(text, langCode);
+      var attempts = 0;
+
+      function once() {
+        attempts++;
+        return fetch(url, {
+          method: 'GET',
+          credentials: 'omit',
+          cache: 'force-cache',
+          signal: signal
+        }).then(function (res) {
+          if (!res.ok) throw new Error('tts-http-' + res.status);
+          return res.blob();
+        }).then(function (blob) {
+          if (!blob || !blob.size) throw new Error('tts-empty');
+          // Reject JSON error bodies masquerading as 200
+          if (blob.type && /json|text/.test(blob.type) && blob.size < 500) {
+            throw new Error('tts-not-audio');
+          }
+          var obj = root.URL.createObjectURL(blob);
+          Speech.putBlob(key, obj);
+          return obj;
+        }).catch(function (err) {
+          if (signal && signal.aborted) throw err;
+          if (attempts < 3) {
+            return new Promise(function (resolve, reject) {
+              setTimeout(function () {
+                once().then(resolve, reject);
+              }, 250 * attempts);
+            });
+          }
+          throw err;
+        });
+      }
+      return once();
     },
 
+    getAudioEl: function () {
+      if (!Speech.audioEl) Speech.audioEl = new Audio();
+      return Speech.audioEl;
+    },
+
+    playBlobUrl: function (blobUrl, rate) {
+      return new Promise(function (resolve, reject) {
+        var a = Speech.getAudioEl();
+        try {
+          a.onended = null;
+          a.onerror = null;
+          a.ontimeupdate = null;
+          a.oncanplay = null;
+          a.pause();
+        } catch (e0) { }
+        var settled = false;
+        var done = function (err) {
+          if (settled) return;
+          settled = true;
+          a.onended = null;
+          a.onerror = null;
+          if (err) reject(err);
+          else resolve();
+        };
+        a.onended = function () { done(null); };
+        a.onerror = function () { done(new Error('audio-error')); };
+        try { a.playbackRate = rate || 1; } catch (e1) { }
+        a.src = blobUrl;
+        var p;
+        try { p = a.play(); } catch (e2) { done(e2); return; }
+        if (p && typeof p.then === 'function') {
+          p.then(function () { /* playing */ }, function (err) { done(err || new Error('play-rejected')); });
+        }
+      });
+    },
+
+    /* Play cloud narration: fetch blobs then play sequentially. */
     speakWithCloud: function (el, text, opts, state, setIdx, finish, stillMine) {
       var langCode = String(opts.langCode || Speech.lang || 'en').toLowerCase().split('-')[0];
-      var chunks = Speech.chunkText(text, 160);
+      var chunks = Speech.chunkText(text, 140);
       if (!chunks.length) { finish(); return { mode: 'none' }; }
-      var rate = Math.max(0.7, Math.min(1.3, opts.rate != null ? opts.rate : (Speech.rate || 1)));
-      var urls = chunks.map(function (c) { return Speech.cloudUrl(c, langCode); });
+      var rate = Math.max(0.75, Math.min(1.25, opts.rate != null ? opts.rate : (Speech.rate || 1)));
       Speech.lastMode = 'cloud';
-      // Start first chunk NOW (gesture-safe when immediate)
-      Speech.playUrlList(urls, state, setIdx, finish, stillMine, rate);
+      Speech.needsGesture = false;
+
+      var ac = null;
+      try { ac = new AbortController(); } catch (e) { }
+      state.abort = ac;
+      var signal = ac && ac.signal;
+      var words = state.words;
+      var ci = 0;
+
+      function highlightForChunk(frac) {
+        if (!stillMine()) return;
+        var chunkWords = Math.max(1, Math.ceil(words.length / chunks.length));
+        var startW = ci * chunkWords;
+        var endW = Math.min(words.length, (ci === chunks.length - 1) ? words.length : startW + chunkWords);
+        var wi = startW + Math.floor(frac * Math.max(1, endW - startW));
+        setIdx(Math.max(startW, Math.min(endW - 1, wi)));
+      }
+
+      function playNext() {
+        if (!stillMine()) return;
+        if (ci >= chunks.length) {
+          finish();
+          return;
+        }
+        var piece = chunks[ci];
+        Speech.fetchCloudBlob(piece, langCode, signal).then(function (blobUrl) {
+          if (!stillMine()) return;
+          var a = Speech.getAudioEl();
+          a.ontimeupdate = function () {
+            if (!stillMine()) return;
+            var frac = (a.duration && a.duration > 0) ? (a.currentTime / a.duration) : 0;
+            highlightForChunk(frac);
+          };
+          return Speech.playBlobUrl(blobUrl, rate).then(function () {
+            if (!stillMine()) return;
+            highlightForChunk(1);
+            ci++;
+            // Small gap between chunks — keeps rate-limit happier
+            setTimeout(function () { playNext(); }, 120);
+          });
+        }).catch(function (err) {
+          if (!stillMine()) return;
+          Speech.lastError = String(err && err.message || err);
+          // play() rejected without gesture
+          if (/NotAllowedError|play-rejected|user didn't interact|not allowed/i.test(Speech.lastError)) {
+            Speech.needsGesture = true;
+            Speech.lastMode = 'needs-gesture';
+            finish();
+            return;
+          }
+          // Skip bad chunk once; if first chunk fails hard, stop
+          if (ci === 0 && chunks.length === 1) {
+            finish();
+            return;
+          }
+          ci++;
+          setTimeout(function () { playNext(); }, 180);
+        });
+      }
+
+      playNext();
       return { mode: 'cloud', chunks: chunks.length };
     },
 
@@ -376,8 +483,6 @@
       if (!synth) return null;
       var langCode = String(opts.langCode || Speech.lang || 'en').toLowerCase().split('-')[0];
       var voice = Speech.pickVoice(langCode, { allowSibling: !!opts.allowSibling });
-      // Refuse to use device path without a matching voice for non-English
-      // (engine would often stay silent or mangle the script).
       if (langCode !== 'en' && !voice) return null;
 
       var pro = Speech.kidProsody(langCode);
@@ -411,13 +516,11 @@
         var err = (ev && ev.error) || '';
         Speech.lastError = err || 'error';
         if (err === 'interrupted' || err === 'canceled' || err === 'cancelled') return;
-        // Fall through to cloud for mother-tongue
-        if (langCode !== 'en' && Speech.cloudEnabled && Speech.online() && !opts._usedCloud) {
+        if (Speech.cloudEnabled && Speech.online() && !opts._usedCloud) {
           opts._usedCloud = true;
           Speech.speakWithCloud(el, text, opts, state, setIdx, finish, stillMine);
           return;
         }
-        // timed highlight
         var i2 = 0;
         var step2 = function () {
           if (!stillMine()) return;
@@ -447,18 +550,17 @@
         stepH();
       }, 700);
 
-      // Watchdog → cloud
       setTimeout(function () {
         if (!stillMine()) return;
         try {
           if (synth.paused) synth.resume();
-          if (!synth.speaking && !synth.pending && langCode !== 'en' && Speech.online() && !opts._usedCloud) {
+          if (!synth.speaking && !synth.pending && Speech.online() && !opts._usedCloud) {
             opts._usedCloud = true;
             try { synth.cancel(); } catch (e) { }
             Speech.speakWithCloud(el, text, opts, state, setIdx, finish, stillMine);
           }
         } catch (e4) { }
-      }, 900);
+      }, 1000);
 
       Speech.lastMode = 'speech';
       return { mode: 'speech', lang: u.lang };
@@ -473,9 +575,16 @@
 
       if (queue && queue.timer) { clearTimeout(queue.timer); queue.timer = null; }
       if (queue && queue.launchTimer) { clearTimeout(queue.launchTimer); queue.launchTimer = null; }
+      if (queue && queue.abort) {
+        try { queue.abort.abort(); } catch (eA) { }
+      }
       if (Speech.audioEl) {
-        try { Speech.audioEl.onended = null; Speech.audioEl.onerror = null; Speech.audioEl.ontimeupdate = null; } catch (e0) { }
-        try { Speech.audioEl.pause(); } catch (e1) { }
+        try {
+          Speech.audioEl.onended = null;
+          Speech.audioEl.onerror = null;
+          Speech.audioEl.ontimeupdate = null;
+          Speech.audioEl.pause();
+        } catch (e1) { }
       }
       if (synth) {
         try { synth.cancel(); } catch (e) { }
@@ -484,7 +593,7 @@
 
       var words = Speech.tokenize(text);
       var spans = el && el.querySelectorAll ? Array.prototype.slice.call(el.querySelectorAll('.w')) : [];
-      var state = { words: words, spans: spans, i: -1, el: el, onDone: opts.onDone, gen: myGen, timer: null, launchTimer: null, done: false };
+      var state = { words: words, spans: spans, i: -1, el: el, onDone: opts.onDone, gen: myGen, timer: null, launchTimer: null, done: false, abort: null };
       queue = state;
 
       var setIdx = function (i) {
@@ -518,7 +627,7 @@
       /* 1) Recorded pack */
       if (opts.audio) {
         Speech.lastMode = 'audio';
-        var aRec = Speech.audioEl || (Speech.audioEl = new Audio());
+        var aRec = Speech.getAudioEl();
         aRec.onended = null;
         aRec.onerror = null;
         aRec.ontimeupdate = null;
@@ -562,29 +671,45 @@
       }
 
       Speech.ensureOn();
-      Speech.unlock();
+      if (opts.immediate) Speech.unlock();
 
-      /* 2) Cloud for mother-tongue when no native voice (THE main fix) */
-      if (Speech.preferCloud(langCode) && !opts._skipCloud) {
+      var wantCloud = Speech.usesCloud(langCode) && !opts.forceDevice && !opts._skipCloud;
+
+      /* Auto-start without gesture + cloud = blocked on mobile.
+         Skip sound and wait for Listen (caller can toast). */
+      if (wantCloud && opts.immediate === false && !opts.allowBackgroundAudio) {
+        Speech.needsGesture = true;
+        Speech.lastMode = 'needs-gesture';
+        // Still light up words slowly so the page doesn't feel dead
+        var ig = 0;
+        var stepG = function () {
+          if (!stillMine()) return;
+          if (ig >= words.length) { finish(); return; }
+          setIdx(ig++);
+          state.timer = setTimeout(stepG, (60000 / Speech.WPM) / Math.max(0.5, Speech.rate || 1));
+        };
+        stepG();
+        return { mode: 'needs-gesture' };
+      }
+
+      /* 2) Cloud for ur/hi/ar (and en without device voice) */
+      if (wantCloud) {
         return Speech.speakWithCloud(el, text, opts, state, setIdx, finish, stillMine);
       }
 
-      /* 3) Device TTS when a real voice exists */
+      /* 3) Device TTS */
       if (synth && (langCode === 'en' || Speech.hasNativeVoice(langCode) || opts.forceDevice)) {
         var dev = Speech.speakWithDevice(el, text, opts, state, setIdx, finish, stillMine);
         if (dev) return dev;
-        // device refused → cloud
         if (Speech.cloudEnabled && Speech.online()) {
           return Speech.speakWithCloud(el, text, opts, state, setIdx, finish, stillMine);
         }
       }
 
-      /* 4) Cloud anyway if online */
       if (Speech.cloudEnabled && Speech.online()) {
         return Speech.speakWithCloud(el, text, opts, state, setIdx, finish, stillMine);
       }
 
-      /* 5) Silent highlight */
       var i2 = 0;
       var step2 = function () {
         if (!stillMine()) return;
@@ -603,7 +728,6 @@
         Speech.unlock();
         var code = lang || Speech.lang || 'en';
         var short = String(code).split('-')[0];
-        // Reuse full pipeline with a dummy element
         var dummy = { querySelectorAll: function () { return []; } };
         Speech.speakElement(dummy, String(text), {
           langCode: short,

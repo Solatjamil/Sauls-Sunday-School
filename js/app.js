@@ -585,12 +585,12 @@
       var youngStory = tier() === 'L';
       var nl = narrLang();
       var dir = (nl === 'ur' || nl === 'ar') ? 'rtl' : 'ltr';
-      html += '<div class="read-bar"><button class="btn primary pill" data-act="narrate">' + ico('play') + '<span>' + esc(t('player.listen')) + '</span></button>' +
+      html += '<div class="read-bar"><button class="btn primary pill big-listen" data-act="narrate">' + ico('play') + '<span>' + esc(t('player.listen')) + '</span></button>' +
         '<button class="btn ghost pill" data-act="narrate-stop">' + ico('stop') + '</button>' +
         (youngStory ? '' : '<label class="tog"><input type="checkbox" data-set="readAlong"' + (St.root.settings.readAlong ? ' checked' : '') + '/><span>' + esc(t('player.readAlong')) + '</span></label>') +
         '<button class="btn ghost pill" data-act="rate-toggle">' + esc(t('player.speed')) + ' ×' + Sp.rate + '</button></div>';
       html += voiceToggleHTML();
-      html += '<p class="voice-hint">' + esc(t('player.voiceLangHint')) + '</p>';
+      html += '<p class="voice-hint">' + esc(nl === 'en' ? t('player.voiceLangHint') : t('player.tapListen')) + '</p>';
       if (youngStory) {
         var sceneKey = page[0] ? ('s' + page[0].i) : ('s' + st.page);
         html += '<div class="story-theatre soft-motion" data-skin="young">' +
@@ -622,12 +622,16 @@
         html += '<button class="btn linkbtn" data-act="phase" data-arg="quiz">' + esc(t('quiz.title')) + ' →</button>';
       }
       App.afterPaint = function () {
-        if (St.root.settings.narration !== false && !st.autoPlayed) {
+        // English can auto-speak on-device. Urdu/Hindi/Arabic use online audio and
+        // MUST start from a Listen tap on mobile (autoplay is blocked → silence).
+        var nl0 = narrLang();
+        var canAuto = nl0 === 'en' && St.root.settings.narration !== false && !st.autoPlayed;
+        if (canAuto) {
           st.autoPlayed = true;
           if (Sp.ensureOn) Sp.ensureOn(); else Sp.enabled = true;
-          // Auto-start is not a user gesture — engine may still speak after unlock
-          // from an earlier Listen tap; if blocked, child taps Listen (gesture path).
           narrate({ fromGesture: false });
+        } else if (nl0 !== 'en' && !st.autoPlayed) {
+          st.autoPlayed = true; // don't loop; wait for Listen
         }
       };
       return html;
@@ -698,15 +702,17 @@
     var nl = narrLang();
     var bcp = (Sp.bcp47 ? Sp.bcp47(nl) : ({ en: 'en-GB', ur: 'ur-PK', hi: 'hi-IN', ar: 'ar-SA' }[nl] || 'en-GB'));
     Sp.lang = nl;
-    // Drop a saved English-only voice when narrating another language
     if (nl !== 'en' && Sp.voiceURI && Sp.voicesFor) {
       var okV = Sp.voicesFor(nl).some(function (v) { return v.voiceURI === Sp.voiceURI; });
       if (!okV) Sp.voiceURI = null;
     }
+    var fromGesture = opts.fromGesture === true;
+    // Mother-tongue needs a real Listen tap on phones (online audio).
+    if (!fromGesture && nl !== 'en') {
+      if (App.toast) App.toast(t('player.tapListen'));
+      return;
+    }
     var idx = 0;
-    // First paragraph must speak inside the user-gesture turn (Listen tap).
-    // Delaying with setTimeout drops mobile activation → total silence.
-    var first = opts.fromGesture !== false;
     function speakOne(isFirst) {
       if (idx >= paras.length) { Sp.stop(); return; }
       var elx = paras[idx];
@@ -718,15 +724,16 @@
         langCode: nl,
         audio: url || null,
         noAudio: !url,
-        immediate: !!isFirst, // keep gesture for para 0
+        // fromGesture keeps audio.play() inside the user activation for para 0
+        immediate: !!(isFirst && fromGesture),
+        allowBackgroundAudio: fromGesture && !isFirst,
         onDone: function () {
           idx++;
-          // later paragraphs are chained (gesture already consumed)
-          setTimeout(function () { speakOne(false); }, 220);
+          setTimeout(function () { speakOne(false); }, 280);
         }
       });
     }
-    speakOne(first);
+    speakOne(true);
   }
   actions['narrate'] = function () { narrate({ fromGesture: true }); };
   actions['narrate-stop'] = function () { Sp.stop(); };
@@ -734,17 +741,22 @@
     var ok = { en: 1, ur: 1, hi: 1, ar: 1 };
     if (!ok[code]) return;
     St.setSetting('narrLang', code);
-    // Switching language always re-enables voice — child expects to hear the new tongue
     St.setSetting('narration', true);
     if (Sp.ensureOn) Sp.ensureOn(); else Sp.enabled = true;
     Sp.lang = code;
-    Sp.voiceURI = null; // allow auto-pick of a mother-tongue voice
+    Sp.voiceURI = null;
     St.setSetting('voice', null);
     var st = App.unitState;
-    // Reset so story view's afterPaint re-narrates in the new language
-    if (st) st.autoPlayed = false;
+    // Show the new language text; do NOT auto-play (mobile blocks it → "unresponsive")
+    if (st) st.autoPlayed = true;
     Sp.stop();
     paint();
+    if (code !== 'en' && App.toast) {
+      setTimeout(function () { App.toast(t('player.tapListen')); }, 40);
+    } else if (code === 'en' && st && st.phase === 'story') {
+      // English can start from device TTS without a fresh gesture sometimes
+      st.autoPlayed = false;
+    }
   };
   actions['rate-toggle'] = function () {
     Sp.rate = Sp.rate >= 1.3 ? 0.8 : Math.round((Sp.rate + 0.2) * 10) / 10;
