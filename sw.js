@@ -1,12 +1,13 @@
 /* Offline shell: caches the whole app, then serves cache-first for
    same-origin GETs. Content data is bundled in JS, so one cache =
    a fully working app with no network. */
-const VER = 'sssd-v14';
+const VER = 'sssd-v15';
 const CORE = ['./', './index.html', './css/app.css', './manifest.webmanifest', './robots.txt', './sitemap.xml',
   './js/core/logic.js', './js/core/i18n.js', './js/core/store.js', './js/core/art.js',
   './js/core/speech.js', './js/core/sync.js', './js/app.js', './js/app2.js',
   './js/data/meta.js', './js/data/units-1.js', './js/data/units-2.js', './js/data/units-3.js',
   './js/data/units-4.js', './js/data/units-5.js', './js/data/units-6.js', './js/data/units-7.js',
+  './js/data/units-8.js',
   './js/data/audio.js',
   './js/data/story-i18n.js',
   './assets/icons/icon-192.png', './assets/icons/icon-512.png'];

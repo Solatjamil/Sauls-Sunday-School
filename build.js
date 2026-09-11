@@ -12,7 +12,7 @@ const OUT = path.join(ROOT, 'dist');
 const SRC_ORDER = [
   'js/core/logic.js', 'js/core/i18n.js', 'js/data/meta.js',
   'js/data/units-1.js', 'js/data/units-2.js', 'js/data/units-3.js', 'js/data/units-4.js',
-  'js/data/units-5.js', 'js/data/units-6.js', 'js/data/units-7.js',
+  'js/data/units-5.js', 'js/data/units-6.js', 'js/data/units-7.js', 'js/data/units-8.js',
   'js/data/audio.js',
   'js/data/story-i18n.js',
   'js/core/store.js', 'js/core/art.js', 'js/core/speech.js', 'js/core/sync.js',
