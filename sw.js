@@ -1,7 +1,7 @@
 /* Offline shell: caches the whole app, then serves cache-first for
    same-origin GETs. Content data is bundled in JS, so one cache =
    a fully working app with no network. */
-const VER = 'sssd-v11';
+const VER = 'sssd-v12';
 const CORE = ['./', './index.html', './css/app.css', './manifest.webmanifest', './robots.txt', './sitemap.xml',
   './js/core/logic.js', './js/core/i18n.js', './js/core/store.js', './js/core/art.js',
   './js/core/speech.js', './js/core/sync.js', './js/app.js', './js/app2.js',
@@ -22,6 +22,11 @@ self.addEventListener('fetch', (e) => {
   if (req.method !== 'GET') return;
   let url; try { url = new URL(req.url); } catch (err) { return; }
   if (url.origin !== self.location.origin) return;
+  // Never cache or rewrite TTS / API — always network
+  if (url.pathname.indexOf('/api/') === 0) {
+    e.respondWith(fetch(req));
+    return;
+  }
   e.respondWith(
     caches.match(req, { ignoreSearch: true }).then((hit) => {
       if (hit) return hit;
